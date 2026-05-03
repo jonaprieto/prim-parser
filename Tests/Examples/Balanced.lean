@@ -13,7 +13,7 @@ open Parser Balanced
 #guard group.runResult? (toText "(()") == none
 #guard group.runResult? (toText ")(") == none
 
-#guard balanced.runResult? (toText "") == some []
-#guard balanced.runResult? (toText "()") == some [()]
-#guard balanced.runResult? (toText "()()") == some [(), ()]
-#guard balanced.runResult? (toText "(())()") == some [(), ()]
+#guard balanced.runResult? (toText "") == some ()
+#guard balanced.runResult? (toText "()") == some ()
+#guard balanced.runResult? (toText "()()") == some ()
+#guard balanced.runResult? (toText "(())()") == some ()

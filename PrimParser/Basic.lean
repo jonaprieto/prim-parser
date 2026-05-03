@@ -501,6 +501,14 @@ def many1 (p : Parser ε ⟨ge, always⟩ α) : Parser ε ⟨ge, always⟩ (NonE
   return x ::₁ xs
   grade_by by simp
 
+/-- Apply `p` zero or more times, discarding results. -/
+def skipMany (p : Parser ε ⟨ge, always⟩ α) : Parser ε .flexible PUnit :=
+  () <$ᵍ many p
+
+/-- Apply `p` one or more times, discarding results. -/
+def skipMany1 (p : Parser ε ⟨ge, always⟩ α) : Parser ε ⟨ge, always⟩ PUnit :=
+  () <$ᵍ many1 p
+
 /-- Consume characters while `f` holds, returning the collected string. -/
 def takeWhile (f : Char → Bool) : Parser Error .flexible String :=
   String.ofList <$>ᵍ many (satisfy f)

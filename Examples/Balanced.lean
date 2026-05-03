@@ -12,7 +12,7 @@ def group : Parser Error .conditional PUnit :=
     return ())
 
 /-- A sequence of balanced groups, e.g. `()()`, `()(())`. -/
-def balanced : Parser Error .flexible (List PUnit) :=
-  many group
+def balanced : Parser Error .flexible PUnit :=
+  skipMany group
 
 end Balanced

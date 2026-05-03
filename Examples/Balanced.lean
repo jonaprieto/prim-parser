@@ -1,0 +1,18 @@
+import PrimParser
+
+open Parser
+
+namespace Balanced
+
+def group : Parser Error .conditional PUnit :=
+  fix (fun rec => gdo
+    char '('
+    many rec
+    char ')'
+    return ())
+
+/-- A sequence of balanced groups, e.g. `()()`, `()(())`. -/
+def balanced : Parser Error .flexible (List PUnit) :=
+  many group
+
+end Balanced

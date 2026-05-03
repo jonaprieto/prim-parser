@@ -7,6 +7,8 @@ inductive Necessity where
   | never
   deriving Repr
 
+export Necessity (possibly always never)
+
 namespace Necessity
 
 instance : Max Necessity where
@@ -75,8 +77,8 @@ variable
 @[simp] theorem complement_always : always.complement = never := by decide
 @[simp] theorem complement_possibly : possibly.complement = possibly := by decide
 @[simp] theorem complement_never : never.complement = always := by decide
-@[simp] theorem max_never_right : a ⊔ .never = a := by cases a <;> decide
-@[simp] theorem max_never_left : .never ⊔ a = a := by cases a <;> decide
+@[simp] theorem max_never_right : a ⊔ never = a := by cases a <;> decide
+@[simp] theorem max_never_left : never ⊔ a = a := by cases a <;> decide
 
 @[simp] theorem never_le : never ≤ a := by cases a <;> decide
 @[simp] theorem le_always : a ≤ always := by cases a <;> decide

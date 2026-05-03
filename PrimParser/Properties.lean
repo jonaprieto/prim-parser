@@ -4,7 +4,7 @@ import PrimParser.Basic
 # PrimParser Lawfulness Proofs
 
 Lawful instances for `Success`, `Outcome`, and `Parser`:
-`LawfulFunctor`, `LawfulGFunctor`, `LawfulGApplicative`, `LawfulGMonad`.
+`LawfulFunctor`, `LawfulGradedFunctor`, `LawfulGradedApplicative`, `LawfulGradedMonad`.
 -/
 
 namespace Parser
@@ -33,13 +33,13 @@ instance : LawfulFunctor (Outcome ε n g) where
     · simp [Functor.map]
     · apply comp_map f h x
 
-instance : LawfulGFunctor (Success n) where
+instance : LawfulGradedFunctor (Success n) where
   gmap_id x := by cases x; rfl
   gmap_comp g h x := by cases x; rfl
 
-instance : LawfulGFunctor (Parser ε) where
-  gmap_comp := by intro g _ _ _ f h p; simp [GFunctor.gmap]; ext n t; congr
-  gmap_id := by intro g α ⟨p⟩; simp [GFunctor.gmap]
+instance : LawfulGradedFunctor (Parser ε) where
+  gmap_comp := by intro g _ _ _ f h p; simp [GradedFunctor.gmap]; ext n t; congr
+  gmap_id := by intro g α ⟨p⟩; simp [GradedFunctor.gmap]
 
 theorem gbind_assoc
   {ge1 gc1 ge2 gc2 ge3 gc3 : Necessity}
@@ -141,11 +141,11 @@ theorem gbind_assoc
           · cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
           · apply proof_irrel_heq
 
-instance : LawfulGApplicative (Parser ε) where
+instance : LawfulGradedApplicative (Parser ε) where
   gmap_gpure := by intro _ _ _ _; congr
   gpure_gseq := by
     intro ⟨ge, gc⟩ α β f ⟨p⟩
-    simp [GFunctor.gmap, GApplicative.gseq, bind, gpure]
+    simp [GradedFunctor.gmap, GradedApplicative.gseq, bind, gpure]
     ext n t
     simp [Success.bindParser]
     cases ge <;> simp
@@ -154,7 +154,7 @@ instance : LawfulGApplicative (Parser ε) where
 
   gseq_gpure := by
     intro ⟨ge, gc⟩ α β ⟨p⟩ a
-    cases ge <;> cases gc <;> simp [GFunctor.gmap, GApplicative.gseq, bind, gpure] <;> funext n t
+    cases ge <;> cases gc <;> simp [GradedFunctor.gmap, GradedApplicative.gseq, bind, gpure] <;> funext n t
       <;> simp [Functor.map, Success.bindParser, Success.seq, Outcome.throw, Sum.bind]
       <;> cases p t <;> simp
 
@@ -162,13 +162,13 @@ instance : LawfulGApplicative (Parser ε) where
     intro ⟨ge1, gc1⟩ ⟨ge2, gc2⟩ ⟨ge3, gc3⟩ α β γ ⟨p1⟩ ⟨p2⟩ ⟨p3⟩
     cases ge1
     · case possibly =>
-      simp [GApplicative.gseq, bind]
+      simp [GradedApplicative.gseq, bind]
       congr 1
       · grind
       · simp [HMul.hMul, Mul.mul]
         refine Function.hfunext rfl ?_; intro _ _ .rfl
         refine Function.hfunext rfl ?_; intro t1 t2 .rfl
-        cases ge2 <;> simp [GFunctor.gmap, Functor.map, Sum.bind]
+        cases ge2 <;> simp [GradedFunctor.gmap, Functor.map, Sum.bind]
         · cases p1 t1 <;> simp [Outcome.throw, Success.bindParser]
           · cases ge3 <;> simp <;> congr 2 <;> apply max_assoc
           · next v =>
@@ -208,9 +208,9 @@ instance : LawfulGApplicative (Parser ε) where
               · apply max_assoc
               · apply max_assoc
               · apply proof_irrel_heq
-    · case always => simp [GApplicative.gseq, bind]; congr 1; grind
+    · case always => simp [GradedApplicative.gseq, bind]; congr 1; grind
     · case never =>
-      simp [GApplicative.gseq, bind]
+      simp [GradedApplicative.gseq, bind]
       congr 1
       · grind
       · simp [HMul.hMul, Mul.mul]
@@ -218,7 +218,7 @@ instance : LawfulGApplicative (Parser ε) where
         · case possibly =>
           refine Function.hfunext rfl ?_; intro _ _ .rfl
           refine Function.hfunext rfl ?_; intro t1 t2 .rfl
-          simp [GFunctor.gmap, Functor.map, Success.bindParser, Sum.bind, Success.seq]
+          simp [GradedFunctor.gmap, Functor.map, Success.bindParser, Sum.bind, Success.seq]
           cases ge3 <;> simp
           · case possibly =>
             cases p2 (Success.restText (p1 t1)) <;> simp [Outcome.throw]
@@ -233,28 +233,28 @@ instance : LawfulGApplicative (Parser ε) where
             cases p2 (Success.restText (p1 t1)) <;> simp [Outcome.throw]
             · congr 2; cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
             · congr 2 <;> · cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
-        · case always => ext n a; simp [GFunctor.gmap, Functor.map, Success.bindParser]
+        · case always => ext n a; simp [GradedFunctor.gmap, Functor.map, Success.bindParser]
         · case never =>
           cases ge3
           · case possibly =>
             refine Function.hfunext rfl ?_; intro _ _ .rfl
             refine Function.hfunext rfl ?_; intro t1 t2 .rfl
-            simp [GFunctor.gmap, Functor.map, Success.bindParser, Sum.bind, Success.seq]
+            simp [GradedFunctor.gmap, Functor.map, Success.bindParser, Sum.bind, Success.seq]
             cases p3 (Success.restText (p2 (Success.restText (p1 t1)))) <;> simp
             · congr 1; cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
             · congr 1 <;> cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
           · case always =>
-            simp [GFunctor.gmap, Functor.map, Success.bindParser]
+            simp [GradedFunctor.gmap, Functor.map, Success.bindParser]
             ext n t; congr
           · case never =>
-            simp [Success.bindParser, Success.seq, Functor.map, GFunctor.gmap]
+            simp [Success.bindParser, Success.seq, Functor.map, GradedFunctor.gmap]
             refine Function.hfunext rfl ?_; intro _ _ .rfl
             refine Function.hfunext rfl ?_; intro _ _ .rfl
             congr 1
             · cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
             · apply proof_irrel_heq
 
-instance : LawfulGMonad (Parser ε) where
+instance : LawfulGradedMonad (Parser ε) where
   gpure_gbind := by
     intro ⟨ge, gc⟩ _ _ a f
     cases ge <;> simp [gpure, gbind, bind, Success.bindParser, Success.seq] <;> try (rcases f a with ⟨run'⟩; simp)

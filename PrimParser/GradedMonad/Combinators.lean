@@ -4,7 +4,7 @@ import PrimParser.GradedMonad.DoNotation
 
 variable
   {G : Type} [Monoid G]
-  {M : GradedType G} [GMonad M]
+  {M : GradedType G} [GradedMonad M]
   {g gl gr : G}
   {α β γ : Type}
 

@@ -43,22 +43,22 @@ private partial def expandGDoBlock (doSeq : Syntax) : MacroM (TSyntax `term) := 
 where
   expandGDoElem (elem : Syntax) (rest : TSyntax `term) : MacroM (TSyntax `term) :=
     match elem with
-    | `(doElem| let $x:ident ← $e:term) => `(GMonad.gbind $e fun $x => $rest)
-    | `(doElem| let _ ← $e:term) => `(GMonad.gbind $e fun _ => $rest)
-    | `(doElem| let $x:ident : $ty:term ← $e:term) => `(GMonad.gbind $e fun ($x : $ty) => $rest)
+    | `(doElem| let $x:ident ← $e:term) => `(GradedMonad.gbind $e fun $x => $rest)
+    | `(doElem| let _ ← $e:term) => `(GradedMonad.gbind $e fun _ => $rest)
+    | `(doElem| let $x:ident : $ty:term ← $e:term) => `(GradedMonad.gbind $e fun ($x : $ty) => $rest)
     | `(doElem| let $x:ident := $e:term) => `(let $x := $e; $rest)
     | `(doElem| let $x:ident : $ty:term := $e:term) => `(let $x : $ty := $e; $rest)
     | _ =>
       if elem.isOfKind ``Lean.Parser.Term.doMatch then do
         let matchTerm ← expandDoMatch elem
-        `(GMonad.gbind $matchTerm fun _ => $rest)
+        `(GradedMonad.gbind $matchTerm fun _ => $rest)
       else
         let e : TSyntax `term := ⟨elem.getArgs.back!⟩
-        `(GMonad.gbind $e fun _ => $rest)
+        `(GradedMonad.gbind $e fun _ => $rest)
   expandGDoFinal (elem : Syntax) : MacroM (TSyntax `term) := do
     match elem with
-    | `(doElem| return $e:term) => `(GApplicative.gpure $e)
-    | `(doElem| return) => `(GApplicative.gpure ())
+    | `(doElem| return $e:term) => `(GradedApplicative.gpure $e)
+    | `(doElem| return) => `(GradedApplicative.gpure ())
     | _ =>
       if elem.isOfKind ``Lean.Parser.Term.doMatch then
         expandDoMatch elem
@@ -85,7 +85,7 @@ open Lean in
 section GDoExamples
 
 variable
-  {M : GradedType G} [GMonad M]
+  {M : GradedType G} [GradedMonad M]
   {α β γ : Type} {i j k : G}
 
 example (a : α) : M 1 α :=

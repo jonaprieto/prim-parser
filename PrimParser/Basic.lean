@@ -155,7 +155,7 @@ def Outcome.handle
 instance : Functor (Success n gc) where
   map f x := {x with result := f x.result}
 
-instance : GFunctor (Success n) where
+instance : GradedFunctor (Success n) where
   gmap := Functor.map
 
 instance : Functor (Outcome ε n g) where
@@ -215,7 +215,7 @@ def Success.bindParser {xc fe fc : Necessity}
     | .inr y => .inr (x.seq y)
     | .inl e => .inl e
 
-instance : GFunctor (Parser ε) where
+instance : GradedFunctor (Parser ε) where
   gmap f p := ⟨fun t => f <$> p.run t⟩
 
 def Outcome.throw (e : ε) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α := by
@@ -257,11 +257,11 @@ instance : IsEmpty (Parser ε .impossible α) where
 abbrev pure (a : α) : Parser ε 1 α where
   run t := ⟨a, t, rfl⟩
 
-instance : GApplicative (Parser ε) where
+instance : GradedApplicative (Parser ε) where
   gpure := pure
   gseq f g := bind f fun f' => ⟨fun t => f' <$> (g ()).run t⟩
 
-instance : GMonad (Parser ε) where
+instance : GradedMonad (Parser ε) where
   gbind := bind
 
 /-- Build a recursive parser via a fixpoint. Termination is guaranteed by

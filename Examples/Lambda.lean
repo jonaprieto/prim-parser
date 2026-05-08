@@ -11,17 +11,17 @@ inductive Term where
 
 namespace Term
 
-private def ident : Parser Error .conditional String :=
+private def ident : Parser Error conditional String :=
   lexeme (takeWhile1 Char.isAlpha)
 
-def term : Parser Error .conditional Term :=
+def term : Parser Error conditional Term :=
   fix (fun term_rec =>
     let atom := var <$>ᵍ ident <|> parens term_rec
-    let appTerm : Parser Error .conditional Term := gdo
+    let appTerm : Parser Error conditional Term := gdo
       let f ← atom
       let args ← many atom
       return args.foldl app f
-    let lamTerm : Parser Error .conditional Term := gdo
+    let lamTerm : Parser Error conditional Term := gdo
       lexeme (char '\\')
       let x ← ident
       lexeme (char '.')

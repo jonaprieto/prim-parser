@@ -82,6 +82,8 @@ def choice (a b : Grade) : Grade where
 
 end Grade
 
+export Grade (impossible conditional flexible fallible pure lookahead empty)
+
 namespace Parser
 
 variable
@@ -250,7 +252,7 @@ def bind
       | never => .inr (x'.bindParser f)
       | possibly => x'.bindParser f⟩
 
-instance : IsEmpty (Parser ε .impossible α) where
+instance : IsEmpty (Parser ε impossible α) where
   false p := by cases p.run ⟨[], rfl⟩; contradiction
 
 /-- Lift a value into a parser that consumes nothing and never fails. -/
@@ -377,7 +379,7 @@ def weakenErrors (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨possibly, gc⟩ 
       (fun _ r => .inr r)
 
 /-- Weaken both grades to `possibly`, yielding a `fallible` parser. -/
-def weaken (p : Parser ε ⟨ge, gc⟩ α) : Parser ε .fallible α :=
+def weaken (p : Parser ε ⟨ge, gc⟩ α) : Parser ε fallible α :=
   p.weakenErrors.weakenConsumes
 
 /-- Run a parser, discarding the error and returning the `Success` as an `Option`. -/
@@ -389,7 +391,7 @@ def runResult? (p : Parser ε ⟨ge, gc⟩ α) (t : Text n) : Option α :=
   p.run t |>.handle (fun _ _ => .none) (fun _ r => .some r.result)
 
 /-- Consume and return a single character, or fail on empty input. -/
-def anyChar : Parser Error .conditional Char where
+def anyChar : Parser Error conditional Char where
   run {n} t :=
     match n, t with
     | 0, .nil => .inl Error.eof
@@ -413,23 +415,23 @@ def ok (a : α) (he : ge ≤ possibly := by simp) (hc : gc ≤ possibly := by si
               | never => gpure a
 
 /-- Consume a character and apply `f`; succeed with the result or fail if `f` returns `none`. -/
-def token (f : Char → Option α) : Parser Error .conditional α := gdo
+def token (f : Char → Option α) : Parser Error conditional α := gdo
   let c ← anyChar
   match f c with
   | .some r => ok (gc := never) r
   | .none => throw (ge := possibly) Error.fail
 
 /-- Consume a character that satisfies predicate `f`, or fail. -/
-def satisfy (f : Char → Bool) : Parser Error .conditional Char :=
+def satisfy (f : Char → Bool) : Parser Error conditional Char :=
   token (fun c => if f c then .some c else .none)
 
 /-- Match a specific character. -/
-def char (c : Char) : Parser Error .conditional PUnit :=
+def char (c : Char) : Parser Error conditional PUnit :=
   () <$ᵍ satisfy (· == c)
 
 /-- Match an exact string. -/
-def string (str : String) : Parser Error .conditional PUnit :=
-  let rec go : List Char → Parser Error .conditional PUnit
+def string (str : String) : Parser Error conditional PUnit :=
+  let rec go : List Char → Parser Error conditional PUnit
     | [] => throw Error.fail
     | [c] => () <$ᵍ satisfy (· == c)
     | c :: cs => gdo
@@ -479,7 +481,7 @@ def manyTill [Inhabited ε]
         )
 
 /-- Apply `p` zero or more times, collecting results. Requires `p` to always consume. -/
-def many (p : Parser ε ⟨ge, always⟩ α) : Parser ε .flexible (List α) where
+def many (p : Parser ε ⟨ge, always⟩ α) : Parser ε flexible (List α) where
   run :=
     let rec go {n} (p : Parser ε ⟨ge, always⟩ α) (t : Text n)
         : Success n possibly (List α) :=
@@ -502,7 +504,7 @@ def many1 (p : Parser ε ⟨ge, always⟩ α) : Parser ε ⟨ge, always⟩ (NonE
   grade_by by simp
 
 /-- Apply `p` zero or more times, discarding results. -/
-def skipMany (p : Parser ε ⟨ge, always⟩ α) : Parser ε .flexible PUnit :=
+def skipMany (p : Parser ε ⟨ge, always⟩ α) : Parser ε flexible PUnit :=
   () <$ᵍ many p
 
 /-- Apply `p` one or more times, discarding results. -/
@@ -510,27 +512,27 @@ def skipMany1 (p : Parser ε ⟨ge, always⟩ α) : Parser ε ⟨ge, always⟩ P
   () <$ᵍ many1 p
 
 /-- Consume characters while `f` holds, returning the collected string. -/
-def takeWhile (f : Char → Bool) : Parser Error .flexible String :=
+def takeWhile (f : Char → Bool) : Parser Error flexible String :=
   String.ofList <$>ᵍ many (satisfy f)
 
 /-- Consume one or more characters while `f` holds. -/
-def takeWhile1 (f : Char → Bool) : Parser Error .conditional String :=
+def takeWhile1 (f : Char → Bool) : Parser Error conditional String :=
   (String.ofList ∘ NonEmptyList.toList) <$>ᵍ many1 (satisfy f)
 
 /-- Skip characters while `f` holds. -/
-def skipWhile (f : Char → Bool) : Parser Error .flexible PUnit :=
+def skipWhile (f : Char → Bool) : Parser Error flexible PUnit :=
   () <$ᵍ takeWhile f
 
 /-- Skip one or more characters while `f` holds. -/
-def skipWhile1 (f : Char → Bool) : Parser Error .conditional PUnit :=
+def skipWhile1 (f : Char → Bool) : Parser Error conditional PUnit :=
   () <$ᵍ takeWhile1 f
 
 /-- Skip zero or more whitespace characters. -/
-def whitespace : Parser Error .flexible PUnit :=
+def whitespace : Parser Error flexible PUnit :=
   skipWhile Char.isWhitespace
 
 /-- Skip one or more whitespace characters. -/
-def whitespace1 : Parser Error .conditional PUnit :=
+def whitespace1 : Parser Error conditional PUnit :=
   skipWhile1 Char.isWhitespace
 
 /-- Run `p` then skip trailing whitespace. -/
@@ -565,17 +567,17 @@ def braces (p : Parser Error ⟨ge, gc⟩ α) : Parser Error ⟨ge ⊔ possibly,
   grade_by by simp
 
 /-- Parse a single decimal digit, returning its numeric value. -/
-def digit : Parser Error .conditional Nat :=
+def digit : Parser Error conditional Nat :=
   token fun c => if c.isDigit then some (c.toNat - '0'.toNat) else none
 
 /-- Parse a natural number (one or more digits). -/
-def nat : Parser Error .conditional Nat := gdo
+def nat : Parser Error conditional Nat := gdo
   let d ← digit
   let ds ← many digit
   return ds.foldl (fun acc d => acc * 10 + d) d
 
 /-- Parse an integer (optional leading `-` followed by digits). -/
-def int : Parser Error .conditional Int := gdo
+def int : Parser Error conditional Int := gdo
   let neg ← optional (char '-')
   let n ← nat
   return if neg.isSome then -n else n
@@ -586,7 +588,7 @@ def sepBy
   (sep : Parser ε ⟨ge', gc'⟩ β)
   (p : Parser ε ⟨ge, gc⟩ α)
   (h : gc' ⊔ gc = always := by simp)
-  : Parser ε .flexible (List α) := gdo
+  : Parser ε flexible (List α) := gdo
   let m ← optional p
   match m with
   | .some f =>
@@ -626,7 +628,7 @@ def count
 def sepByN
   (sep : Parser ε ⟨ge', gc'⟩ β)
   (p : Parser ε ⟨ge, gc⟩ α)
-  : (n : Nat) → Parser ε .fallible (List.Vector α n)
+  : (n : Nat) → Parser ε fallible (List.Vector α n)
   | 0 => ok .nil
   | n + 1 => (gdo
     let sepP : Parser ε ⟨ge' ⊔ ge, gc' ⊔ gc⟩ α := gdo
@@ -650,7 +652,7 @@ def chainl1
   grade_by by simp
 
 /-- Succeed only at end of input, consuming nothing. -/
-def eof : Parser Error .lookahead PUnit where
+def eof : Parser Error lookahead PUnit where
   run {n} t := match n with
    | .zero => ok () |>.run t
    | _ => throw Error.fail |>.run t

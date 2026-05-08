@@ -4,7 +4,7 @@ open Parser
 
 namespace Balanced
 
-def group : Parser Error .conditional PUnit :=
+def group : Parser Error conditional PUnit :=
   fix (fun rec => gdo
     char '('
     many rec
@@ -12,7 +12,7 @@ def group : Parser Error .conditional PUnit :=
     return ())
 
 /-- A sequence of balanced groups, e.g. `()()`, `()(())`. -/
-def balanced : Parser Error .flexible PUnit :=
+def balanced : Parser Error flexible PUnit :=
   skipMany group
 
 end Balanced

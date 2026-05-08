@@ -65,7 +65,7 @@ def toText (s : String) : Text s.toList.length := ⟨s.toList, rfl⟩
 #guard int.runResult? (toText "-x") == none
 
 -- chainl1
-private def plus : Parser Error .conditional (Nat → Nat → Nat) := gdo
+private def plus : Parser Error conditional (Nat → Nat → Nat) := gdo
   let _ ← satisfy (· == '+')
   return (· + ·)
 
@@ -105,7 +105,7 @@ private def plus : Parser Error .conditional (Nat → Nat → Nat) := gdo
 #guard (manyTill anyChar (char '.')).runResult? (toText ".") == some []
 
 -- withRecovery
-private def recoverDigit : Error → Parser Error .conditional Nat :=
+private def recoverDigit : Error → Parser Error conditional Nat :=
   fun _ => digit
 
 #guard (withRecovery recoverDigit (char 'x' >>=ᵍ fun _ => gpure 99)).runResult? (toText "x")

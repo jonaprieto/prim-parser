@@ -11,8 +11,9 @@ def group : Parser Error conditional PUnit :=
     char ')'
     return ())
 
-/-- A sequence of balanced groups, e.g. `()()`, `()(())`. -/
-def balanced : Parser Error flexible PUnit :=
+/-- A sequence of balanced groups followed by end-of-input, e.g. `()()`, `()(())`. -/
+def balanced : Parser Error fallible PUnit := gdo
   skipMany group
+  eof
 
 end Balanced

@@ -76,6 +76,8 @@ variable (e1 e2 c1 c2 : Necessity)
 @[simp] theorem one_mk : (1 : Grade) = ⟨never, never⟩ := by
   simp [OfNat.ofNat, One.one]
 
+@[simp] theorem mul_idem (g : Grade) : g * g = g := by cases g; simp
+
 def choice (a b : Grade) : Grade where
   errors := a.errors ⊓ b.errors
   consumes := a.errors.ite b.consumes a.consumes

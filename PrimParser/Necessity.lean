@@ -79,6 +79,7 @@ variable
 @[simp] theorem complement_never : never.complement = always := by decide
 @[simp] theorem max_never_right : a ⊔ never = a := by cases a <;> decide
 @[simp] theorem max_never_left : never ⊔ a = a := by cases a <;> decide
+@[simp] theorem max_idem : a ⊔ a = a := by cases a <;> decide
 
 @[simp] theorem never_le : never ≤ a := by cases a <;> decide
 @[simp] theorem le_always : a ≤ always := by cases a <;> decide

@@ -467,6 +467,9 @@ def optionalBind
     cont a
     grade_by by simp)
 
+def test (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨never, ge.complement ⊓ gc⟩ Bool :=
+  Option.isSome <$>ᵍ optional p
+
 /-- Repeatedly apply `p` until `e` succeeds, collecting the results of `p`. -/
 def manyTill [Inhabited ε]
   (p : Parser ε ⟨ge, always⟩ α)
@@ -664,6 +667,8 @@ def lookahead (p : Parser Error ⟨ge, gc⟩ α) : Parser Error ⟨ge, never⟩ 
   run t := p.run t |>.handle
     (fun h e => Outcome.throw (h := h) e)
     (fun h r => Outcome.ofSuccess (c := h) {result := r.result, restText := t})
+
+def peek : Parser Error Grade.lookahead Char := lookahead anyChar
 
 /-- Succeed (without consuming) only when `p` fails. -/
 def notFollowedBy (p : Parser Error ⟨ge, gc⟩ α) : Parser Error ⟨ge.complement, never⟩ PUnit where

@@ -121,12 +121,18 @@ structure Success (n : Nat) (consumes : Necessity) (α : Type) where
   restText : Text restSize
   witness : consumptionWitness restSize n consumes := by simp
 
+/-- A failed parse result -/
+structure Failure (ε : Type) where
+  error : ε
+  {restSize : Nat}
+  restText : Text restSize
+
 /-- The result type of running a parser -/
 abbrev Outcome (ε : Type) (n : Nat) (g : Grade) (α : Type) : Type :=
   match g.errors with
   | never => Success n g.consumes α
-  | possibly => ε ⊕ Success n g.consumes α
-  | always => ε
+  | possibly => Failure ε ⊕ Success n g.consumes α
+  | always => Failure ε
 
 end Parser
 
@@ -146,7 +152,7 @@ variable
 
 def Outcome.handle
   (p : Outcome ε n ⟨ge, gc⟩ α)
-  (e : possibly ≤ ge → ε → β)
+  (e : possibly ≤ ge → Failure ε → β)
   (s : ge ≤ possibly → Success n gc α → β)
   : β :=
   match ge with
@@ -222,12 +228,15 @@ def Success.bindParser {xc fe fc : Necessity}
 instance : GradedFunctor (Parser ε) where
   gmap f p := ⟨fun t => f <$> p.run t⟩
 
-def Outcome.throw (e : ε) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α := by
+def Outcome.throwFailure (f : Failure ε) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α := by
   rcases g with ⟨g1, g2⟩
   match h : g1 with
-  | possibly => exact .inl e
-  | always => exact e
+  | possibly => exact .inl f
+  | always => exact f
   | never => contradiction
+
+def Outcome.throw {m : Nat} (e : ε) (t : Text m) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α :=
+  Outcome.throwFailure ⟨e, t⟩ h
 
 def Outcome.ofSuccess (r : Success n gc α) (c : ge ≤ possibly := by decide) : Outcome ε n ⟨ge, gc⟩ α :=
   match ge with
@@ -248,7 +257,7 @@ def bind
   | always => x
   | never => x.bindParser f
   | possibly => match x with
-    | .inl e => Outcome.throw (g := ⟨max possibly _, _⟩) e
+    | .inl e => Outcome.throwFailure (g := ⟨max possibly _, _⟩) e
     | .inr x' => match ge' with
       | always => x'.bindParser f
       | never => .inr (x'.bindParser f)
@@ -276,12 +285,12 @@ def fix [Inhabited ε]
   : Parser ε ⟨ge, always⟩ α :=
  let rec go {n} (t : Text n) : Outcome ε n ⟨ge, always⟩ α :=
   match n, t with
-  | 0, _ => Outcome.throw (h := h) default
+  | 0, t => Outcome.throw (h := h) default t
   | n + 1, t =>
     let self : Parser ε ⟨ge, always⟩ α :=
       ⟨fun {k} t' =>
         if k ≤ n then go t'
-        else Outcome.throw (h := h) default⟩
+        else Outcome.throw (h := h) default t'⟩
     f self |>.run t
   ⟨fun t => go t⟩
 
@@ -334,7 +343,7 @@ def oneOf (l : NonEmptyList (Parser ε g α)) : Parser ε g α :=
 
 /-- A parser that always fails with error `e`. -/
 def throw (e : ε) (c : possibly ≤ ge := by simp) : Parser ε ⟨ge, gc⟩ α where
-  run _ := Outcome.throw (h := c) e
+  run t := Outcome.throw (h := c) e t
 
 def Success.relaxConsumes (p : Success n gc α) : Success n (gc ⊓ possibly) α :=
   match gc with
@@ -346,14 +355,14 @@ def Success.relaxConsumes (p : Success n gc α) : Success n (gc ⊓ possibly) α
 def relaxConsumes (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨ge, gc ⊓ possibly⟩ α where
   run t :=
     (p.run t).handle
-      (fun h e => Outcome.throw (h := h) e)
+      (fun h f => Outcome.throwFailure (h := h) f)
       (fun h r => Outcome.ofSuccess (c := h) r.relaxConsumes)
 
 /-- Weaken the error grade by capping at `possibly`. -/
 def relaxErrors (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨ge ⊓ possibly, gc⟩ α where
   run t :=
     (p.run t).handle
-      (fun h e => Outcome.throw (h := le_inf h le_rfl) e)
+      (fun h f => Outcome.throwFailure (h := le_inf h le_rfl) f)
       (fun _ r => Outcome.ofSuccess (c := inf_le_right) r)
 
 /-- Cap both error and consumption grades at `possibly`. -/
@@ -370,14 +379,14 @@ def Success.weakenConsumes (p : Success n gc α) : Success n possibly α :=
 def weakenConsumes (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨ge, possibly⟩ α where
   run t :=
     (p.run t).handle
-      (fun h e => Outcome.throw (h := h) e)
+      (fun h f => Outcome.throwFailure (h := h) f)
       (fun h r => Outcome.ofSuccess (c := h) r.weakenConsumes)
 
 /-- Forget error precision, setting it to `possibly`. -/
 def weakenErrors (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨possibly, gc⟩ α where
   run t :=
     (p.run t).handle
-      (fun _ e => .inl e)
+      (fun _ f => .inl f)
       (fun _ r => .inr r)
 
 /-- Weaken both grades to `possibly`, yielding a `fallible` parser. -/
@@ -396,7 +405,7 @@ def runResult? (p : Parser ε ⟨ge, gc⟩ α) (t : Text n) : Option α :=
 def anyChar : Parser Error conditional Char where
   run {n} t :=
     match n, t with
-    | 0, .nil => .inl Error.eof
+    | 0, .nil => .inl ⟨Error.eof, .nil⟩
     | Nat.succ n, ⟨c :: cs, p⟩ =>
       .inr {result := c
             restSize := n
@@ -665,7 +674,7 @@ def eof : Parser Error lookahead PUnit where
 /-- Run `p` without consuming input, keeping only the result. -/
 def lookahead (p : Parser Error ⟨ge, gc⟩ α) : Parser Error ⟨ge, never⟩ α where
   run t := p.run t |>.handle
-    (fun h e => Outcome.throw (h := h) e)
+    (fun h f => Outcome.throwFailure (h := h) f)
     (fun h r => Outcome.ofSuccess (c := h) {result := r.result, restText := t})
 
 def peek : Parser Error Grade.lookahead Char := lookahead anyChar
@@ -674,7 +683,7 @@ def peek : Parser Error Grade.lookahead Char := lookahead anyChar
 def notFollowedBy (p : Parser Error ⟨ge, gc⟩ α) : Parser Error ⟨ge.complement, never⟩ PUnit where
   run t := p.run t |>.handle
     (fun _ _ => Outcome.ofSuccess (c := by cases ge <;> first | contradiction | decide) {result := (), restText := t})
-    (fun _ _ => Outcome.throw (h := by cases ge <;> first | contradiction | decide) Error.fail)
+    (fun _ _ => Outcome.throw (h := by cases ge <;> first | contradiction | decide) Error.fail t)
 
 /-- Run `p`; if it fails with error `e`, run `recover e`. If recovery also
 fails, report `p`'s original error. -/
@@ -683,8 +692,8 @@ def withRecovery
   (p : Parser ε' ⟨ge', gc'⟩ α)
   : Parser ε' ⟨ge ⊓ ge', ge'.ite gc gc'⟩ α where
   run t := p.run t |>.handle
-    (fun h e => recover e |>.run t |>.handle
-      (fun h' _ => Outcome.throw (h := by grind) e)
+    (fun h f => recover f.error |>.run t |>.handle
+      (fun h' _ => Outcome.throwFailure (h := by grind) f)
       (fun h' r => Outcome.ofSuccess (c := by grind)
         { r with witness := consumptionWitness.ite_right h r.witness }))
     (fun h r => Outcome.ofSuccess (c := by grind)

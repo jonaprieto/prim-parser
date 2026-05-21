@@ -57,7 +57,7 @@ theorem gbind_assoc
       refine Function.hfunext rfl ?_; intro _ _ .rfl
       refine Function.hfunext rfl ?_; intro t _ .rfl
       cases ge2 <;> simp
-      · cases p t <;> simp [Outcome.throw, Success.bindParser]
+      · cases p t <;> simp [Outcome.throwFailure, Success.bindParser]
         · cases ge3 <;> simp <;> congr 2 <;> apply max_assoc
         · next v =>
           cases ge3 <;> simp
@@ -77,8 +77,8 @@ theorem gbind_assoc
               · apply max_assoc
               · apply max_assoc
               · apply proof_irrel_heq
-      · cases p t <;> simp [Outcome.throw, Success.bindParser]
-      · cases p t <;> simp [Outcome.throw, Success.bindParser]
+      · cases p t <;> simp [Outcome.throwFailure, Success.bindParser]
+      · cases p t <;> simp [Outcome.throwFailure, Success.bindParser]
         · cases ge3 <;> simp <;> congr 2 <;> apply max_assoc
         · next v =>
           cases ge3 <;> simp [Success.seq]
@@ -108,7 +108,7 @@ theorem gbind_assoc
         simp [Success.bindParser, Success.seq]
         cases ge3 <;> simp
         · case possibly =>
-          cases p2 (p t).result |>.run (p t).restText <;> simp [Outcome.throw]
+          cases p2 (p t).result |>.run (p t).restText <;> simp [Outcome.throwFailure]
           · congr 2; cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
           · next v =>
             cases p3 v.result |>.run v.restText <;> simp
@@ -117,7 +117,7 @@ theorem gbind_assoc
           cases p2 (p t).result |>.run (p t).restText <;> simp
           · rfl
         · case never =>
-          cases p2 (p t).result |>.run (p t).restText <;> simp [Outcome.throw]
+          cases p2 (p t).result |>.run (p t).restText <;> simp [Outcome.throwFailure]
           · congr 2; cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
           · congr 2 <;> · cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
       · case always => ext n a; simp [Success.bindParser]
@@ -155,7 +155,7 @@ instance : LawfulGradedApplicative (Parser ε) where
   gseq_gpure := by
     intro ⟨ge, gc⟩ α β ⟨p⟩ a
     cases ge <;> cases gc <;> simp [GradedFunctor.gmap, GradedApplicative.gseq, bind, gpure] <;> funext n t
-      <;> simp [Functor.map, Success.bindParser, Success.seq, Outcome.throw, Sum.bind]
+      <;> simp [Functor.map, Success.bindParser, Success.seq, Outcome.throwFailure, Sum.bind]
       <;> cases p t <;> simp
 
   gseq_assoc := by
@@ -169,7 +169,7 @@ instance : LawfulGradedApplicative (Parser ε) where
         refine Function.hfunext rfl ?_; intro _ _ .rfl
         refine Function.hfunext rfl ?_; intro t1 t2 .rfl
         cases ge2 <;> simp [GradedFunctor.gmap, Functor.map, Sum.bind]
-        · cases p1 t1 <;> simp [Outcome.throw, Success.bindParser]
+        · cases p1 t1 <;> simp [Outcome.throwFailure, Success.bindParser]
           · cases ge3 <;> simp <;> congr 2 <;> apply max_assoc
           · next v =>
             cases ge3 <;> simp
@@ -191,8 +191,8 @@ instance : LawfulGradedApplicative (Parser ε) where
                 · apply max_assoc
                 · apply max_assoc
                 · apply proof_irrel_heq
-        · cases p1 t1 <;> simp [Outcome.throw, Success.bindParser]
-        · cases p1 t1 <;> simp [Outcome.throw, Success.bindParser]
+        · cases p1 t1 <;> simp [Outcome.throwFailure, Success.bindParser]
+        · cases p1 t1 <;> simp [Outcome.throwFailure, Success.bindParser]
           · cases ge3 <;> simp <;> congr 2 <;> apply max_assoc
           · next v =>
             cases ge3 <;> simp [Success.seq]
@@ -221,7 +221,7 @@ instance : LawfulGradedApplicative (Parser ε) where
           simp [GradedFunctor.gmap, Functor.map, Success.bindParser, Sum.bind, Success.seq]
           cases ge3 <;> simp
           · case possibly =>
-            cases p2 (Success.restText (p1 t1)) <;> simp [Outcome.throw]
+            cases p2 (Success.restText (p1 t1)) <;> simp [Outcome.throwFailure]
             · congr 2; cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
             · next v =>
               cases p3 (Success.restText v) <;> simp
@@ -230,7 +230,7 @@ instance : LawfulGradedApplicative (Parser ε) where
             cases p2 (Success.restText (p1 t1)) <;> simp
             · rfl
           · case never =>
-            cases p2 (Success.restText (p1 t1)) <;> simp [Outcome.throw]
+            cases p2 (Success.restText (p1 t1)) <;> simp [Outcome.throwFailure]
             · congr 2; cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
             · congr 2 <;> · cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
         · case always => ext n a; simp [GradedFunctor.gmap, Functor.map, Success.bindParser]
@@ -268,7 +268,7 @@ instance : LawfulGradedMonad (Parser ε) where
     · simp [OfNat.ofNat, One.one, HMul.hMul, Mul.mul]
     · refine Function.hfunext rfl ?_; intro _ _ .rfl
       refine Function.hfunext rfl ?_; intro t _ .rfl
-      cases ge <;> simp [Outcome.throw, Success.bindParser, Success.seq]
+      cases ge <;> simp [Outcome.throwFailure, Success.bindParser, Success.seq]
       · case possibly =>
         cases p t <;> simp
         · congr 2; simp [OfNat.ofNat, One.one]

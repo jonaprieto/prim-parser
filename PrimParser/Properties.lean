@@ -71,6 +71,7 @@ theorem gbind_assoc
                 · apply max_assoc
                 · apply proof_irrel_heq
           · cases p2 v.result |>.run v.restText <;> simp [Success.seq]
+            · congr
           · cases p2 v.result |>.run v.restText <;> simp [Success.seq]
             · congr 2; apply max_assoc
             · congr 2
@@ -90,6 +91,7 @@ theorem gbind_assoc
               · apply max_assoc
               · apply max_assoc
               · apply proof_irrel_heq
+          · case always => congr
           · case never =>
             congr 2
             · apply max_assoc
@@ -116,6 +118,7 @@ theorem gbind_assoc
         · case always =>
           cases p2 (p t).result |>.run (p t).restText <;> simp
           · rfl
+          · rfl
         · case never =>
           cases p2 (p t).result |>.run (p t).restText <;> simp [Outcome.throwFailure]
           · congr 2; cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
@@ -133,6 +136,7 @@ theorem gbind_assoc
           · congr 1 <;> cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
         · case always =>
           simp [Success.bindParser, Success.seq]
+          ext; congr
         · case never =>
           simp [Success.bindParser, Success.seq]
           refine Function.hfunext rfl ?_; intro _ _ .rfl
@@ -141,6 +145,7 @@ theorem gbind_assoc
           · cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
           · apply proof_irrel_heq
 
+set_option pp.explicit true
 instance : LawfulGradedApplicative (Parser ε) where
   gmap_gpure := by intro _ _ _ _; congr
   gpure_gseq := by
@@ -149,7 +154,9 @@ instance : LawfulGradedApplicative (Parser ε) where
     ext n t
     simp [Success.bindParser]
     cases ge <;> simp
-    · cases p t <;> simp [Functor.map, Sum.bind, Success.seq]
+    · cases p t <;> simp
+      · simp! [Functor.map]
+      · simp [Functor.map, Sum.bind, Success.seq]
     · cases p t; simp [Functor.map, Success.seq]
 
   gseq_gpure := by
@@ -183,7 +190,8 @@ instance : LawfulGradedApplicative (Parser ε) where
                   · apply max_assoc
                   · apply max_assoc
                   · apply proof_irrel_heq
-            · case always => cases p2 (Success.restText v) <;> simp [Success.seq]
+            · case always =>
+                cases p2 (Success.restText v) <;> simp [Success.seq]; congr
             · case never =>
               cases p2 (Success.restText v) <;> simp [Success.seq]
               · congr 2; apply max_assoc
@@ -203,6 +211,7 @@ instance : LawfulGradedApplicative (Parser ε) where
                 · apply max_assoc
                 · apply max_assoc
                 · apply proof_irrel_heq
+            · case always => congr
             · case never =>
               congr 2
               · apply max_assoc
@@ -228,6 +237,7 @@ instance : LawfulGradedApplicative (Parser ε) where
                 <;> congr 2 <;> cases gc1 <;> cases gc2 <;> cases gc3 <;> simp
           · case always =>
             cases p2 (Success.restText (p1 t1)) <;> simp
+            · rfl
             · rfl
           · case never =>
             cases p2 (Success.restText (p1 t1)) <;> simp [Outcome.throwFailure]

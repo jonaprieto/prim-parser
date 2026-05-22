@@ -91,6 +91,7 @@ namespace Parser
 variable
   {n m : Nat}
   {a gc gc' : Necessity}
+  {ε : Type}
 
 /-- Relates input size `n` and remaining size `m` according to a consumption grade:
 `always` requires strict decrease, `possibly` allows `≤`, `never` requires equality. -/
@@ -122,17 +123,27 @@ structure Success (n : Nat) (consumes : Necessity) (α : Type) where
   witness : consumptionWitness restSize n consumes := by simp
 
 /-- A failed parse result -/
-structure Failure (ε : Type) where
+structure Failure (n : Nat) (ε : Type) where
   error : ε
   {restSize : Nat}
   restText : Text restSize
+  witness : restSize ≤ n := by simp
+
+def Failure.trans (f : Failure m ε) (h : m ≤ n) : Failure n ε where
+  error := f.error
+  restSize := f.restSize
+  restText := f.restText
+  witness := Nat.le_trans f.witness h
+
+@[simp] def Failure.trans_rfl (f : Failure n ε) : f.trans (by simp) = f := by
+  simp [trans]
 
 /-- The result type of running a parser -/
 abbrev Outcome (ε : Type) (n : Nat) (g : Grade) (α : Type) : Type :=
   match g.errors with
   | never => Success n g.consumes α
-  | possibly => Failure ε ⊕ Success n g.consumes α
-  | always => Failure ε
+  | possibly => Failure n ε ⊕ Success n g.consumes α
+  | always => Failure n ε
 
 end Parser
 
@@ -152,7 +163,7 @@ variable
 
 def Outcome.handle
   (p : Outcome ε n ⟨ge, gc⟩ α)
-  (e : possibly ≤ ge → Failure ε → β)
+  (e : possibly ≤ ge → Failure n ε → β)
   (s : ge ≤ possibly → Success n gc α → β)
   : β :=
   match ge with
@@ -177,6 +188,15 @@ instance : Functor (Outcome ε n g) where
 
 def Error.eof : Error := "eof"
 def Error.fail : Error := "fail"
+
+def Success.le (p : Success n gc α) : p.restSize ≤ n :=
+  match gc with
+  | never => le_of_eq p.witness
+  | possibly => p.witness
+  | always => le_of_lt p.witness
+
+def Success.weakenConsumes (p : Success n gc α) : Success n possibly α :=
+  { p with witness := p.le }
 
 def Success.ap
   (r1 : Success n gc (α → β))
@@ -219,24 +239,24 @@ def Success.bindParser {xc fe fc : Necessity}
   (f : α → Parser ε ⟨fe, fc⟩ β)
   : Outcome ε n ⟨fe, xc ⊔ fc⟩ β :=
   match fe with
-  | always => (f x.result).run x.restText
+  | always => (f x.result |>.run x.restText).trans x.le
   | never => x.seq ((f x.result).run x.restText)
   | possibly => match (f x.result).run x.restText with
     | .inr y => .inr (x.seq y)
-    | .inl e => .inl e
+    | .inl e => .inl (e.trans x.le)
 
 instance : GradedFunctor (Parser ε) where
   gmap f p := ⟨fun t => f <$> p.run t⟩
 
-def Outcome.throwFailure (f : Failure ε) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α := by
+def Outcome.throwFailure (f : Failure n ε) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α := by
   rcases g with ⟨g1, g2⟩
   match h : g1 with
   | possibly => exact .inl f
   | always => exact f
   | never => contradiction
 
-def Outcome.throw {m : Nat} (e : ε) (t : Text m) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α :=
-  Outcome.throwFailure ⟨e, t⟩ h
+def Outcome.throw (e : ε) (t : Text n) (h : possibly ≤ g.errors := by simp) : Outcome ε n g α :=
+  Outcome.throwFailure ⟨e, t, by simp⟩ h
 
 def Outcome.ofSuccess (r : Success n gc α) (c : ge ≤ possibly := by decide) : Outcome ε n ⟨ge, gc⟩ α :=
   match ge with
@@ -369,12 +389,6 @@ def relaxErrors (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨ge ⊓ possibly, 
 def relax (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨ge ⊓ possibly, gc ⊓ possibly⟩ α :=
   p.relaxErrors.relaxConsumes
 
-def Success.weakenConsumes (p : Success n gc α) : Success n possibly α :=
-  match gc with
-  | never => { p with witness := le_of_eq p.witness }
-  | possibly => p
-  | always => { p with witness := le_of_lt p.witness }
-
 /-- Forget consumption precision, setting it to `possibly`. -/
 def weakenConsumes (p : Parser ε ⟨ge, gc⟩ α) : Parser ε ⟨ge, possibly⟩ α where
   run t :=
@@ -405,7 +419,7 @@ def runResult? (p : Parser ε ⟨ge, gc⟩ α) (t : Text n) : Option α :=
 def anyChar : Parser Error conditional Char where
   run {n} t :=
     match n, t with
-    | 0, .nil => .inl ⟨Error.eof, .nil⟩
+    | 0, .nil => .inl ⟨Error.eof, .nil, by simp⟩
     | Nat.succ n, ⟨c :: cs, p⟩ =>
       .inr {result := c
             restSize := n

@@ -198,6 +198,14 @@ def Success.le (p : Success n gc α) : p.restSize ≤ n :=
 def Success.weakenConsumes (p : Success n gc α) : Success n possibly α :=
   { p with witness := p.le }
 
+def Success.trans (s : Success m gc α) (h : m ≤ n) : Success n (gc ⊔ possibly) α where
+  result := s.result
+  restSize := s.restSize
+  restText := s.restText
+  witness := by
+    have w := s.witness
+    cases gc <;> omega
+
 def Success.ap
   (r1 : Success n gc (α → β))
   (r2 : Success r1.restSize gc' α)
@@ -326,6 +334,12 @@ private theorem consumptionWitness.ite_left
   : consumptionWitness n m (ge'.ite gc gc') := by
   cases ge' <;> cases gc <;> cases gc' <;> first | contradiction | simp; omega
 
+/-- Run `p`. If it fails, restores the original text. -/
+def withBacktracking {g} (p : Parser ε g α) : Parser ε g α where
+  run t := p.run t |>.handle
+    (fun h f => Outcome.throwFailure (h := h) ⟨f.error, t, Nat.le_refl _⟩)
+    (fun h s => Outcome.ofSuccess (c := h) s)
+
 /-- Try `p1`; if it fails, try `p2`. The error grade is the infimum and
 the consumption grade is computed via `Necessity.ite`. -/
 def choice
@@ -333,7 +347,7 @@ def choice
   (p2 : Parser ε ⟨ge', gc'⟩ α)
   : Parser ε ⟨ge ⊓ ge', ge.ite gc' gc⟩ α where
   run t := match ge with
-    | never => cast (by simp) (p1.run t)
+    | never => gcast (by simp) (p1.run t)
     | always => by simpa using p2.run t
     | possibly => match p1.run t with
       | .inl _ => match ge' with
@@ -351,6 +365,44 @@ def choice
         | possibly | always => .inr r'
 
 infixl:20 " <|> " => choice
+
+/-- try `p1`; if it fails *without consuming*, then try `p2` -/
+def committedChoice
+  (p1 : Parser ε ⟨ge, gc⟩ α)
+  (p2 : Parser ε ⟨ge', gc'⟩ α)
+  : Parser ε ⟨ge ⊓ (ge' ⊔ possibly), ge.ite gc' gc⟩ α where
+  run {n} t := p1.run t |>.handle
+    (fun hge f =>
+      if f.restSize = n then
+        p2.run t |>.handle
+          (fun _ f' =>
+            Outcome.throwFailure (h := by grind) f')
+          (fun hge' s' =>
+            Outcome.ofSuccess (c := by grind)
+              { s' with witness := consumptionWitness.ite_right hge s'.witness })
+      else
+        Outcome.throwFailure (h := by grind) f)
+    (fun hge s =>
+      Outcome.ofSuccess (c := by grind)
+        { s with witness := consumptionWitness.ite_left hge s.witness })
+
+/-- Try `p1` first, if it fails with `Failure f`, run `p2` on `f.restText` -/
+def tryResume
+  (p1 : Parser ε ⟨ge, gc⟩ α)
+  (p2 : Parser ε ⟨ge', gc'⟩ α)
+  : Parser ε ⟨ge ⊓ ge', ge.ite (gc' ⊔ possibly) gc⟩ α where
+  run t := p1.run t |>.handle
+    (fun hge f =>
+      p2.run f.restText |>.handle
+        (fun hge' f' =>
+          Outcome.throwFailure (h := by grind) (f'.trans f.witness))
+        (fun hge' s' =>
+          let lifted := s'.trans f.witness
+          Outcome.ofSuccess (c := by grind)
+            { lifted with witness := consumptionWitness.ite_right hge lifted.witness }))
+    (fun hge s =>
+      Outcome.ofSuccess (c := by grind)
+        { s with witness := consumptionWitness.ite_left hge s.witness })
 
 /-- Try each parser in the list in order, returning the first success. -/
 def oneOf (l : NonEmptyList (Parser ε g α)) : Parser ε g α :=

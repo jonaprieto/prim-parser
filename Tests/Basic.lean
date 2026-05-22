@@ -112,3 +112,11 @@ private def recoverDigit : Error → Parser Error conditional Nat :=
     == some 99
 #guard (withRecovery recoverDigit (char 'x' >>=ᵍ fun _ => gpure 99)).runResult? (toText "5")
     == some 5
+
+-- tryResume
+private def alwaysFail : Parser Error conditional Char := satisfy (fun _ => false)
+#guard (tryResume alwaysFail anyChar).runResult? (toText "abc") == some 'b'
+#guard (tryResume (withBacktracking alwaysFail) anyChar).runResult? (toText "abc") == some 'a'
+
+-- choice
+#guard (alwaysFail <|> anyChar).runResult? (toText "abc") == some 'a'

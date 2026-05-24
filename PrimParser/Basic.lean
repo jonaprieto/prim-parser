@@ -346,23 +346,17 @@ def choice
   (p1 : Parser ε ⟨ge, gc⟩ α)
   (p2 : Parser ε ⟨ge', gc'⟩ α)
   : Parser ε ⟨ge ⊓ ge', ge.ite gc' gc⟩ α where
-  run t := match ge with
-    | never => gcast (by simp) (p1.run t)
-    | always => by simpa using p2.run t
-    | possibly => match p1.run t with
-      | .inl _ => match ge' with
-        | never =>
-          let r := p2.run t
-          { r with witness := consumptionWitness.ite_right le_rfl r.witness }
-        | always => .inl (p2.run t)
-        | possibly => match p2.run t with
-          | .inl e => .inl e
-          | .inr r => .inr { r with witness := consumptionWitness.ite_right le_rfl r.witness }
-      | .inr r =>
-        let r' := { r with witness := consumptionWitness.ite_left le_rfl r.witness }
-        match ge' with
-        | never => r'
-        | possibly | always => .inr r'
+  run t := p1.run t |>.handle
+    (fun hge _ =>
+      p2.run t |>.handle
+        (fun hge' f' =>
+          Outcome.throwFailure (h := by grind) f')
+        (fun hge' s' =>
+          Outcome.ofSuccess (c := by grind)
+            { s' with witness := consumptionWitness.ite_right hge s'.witness }))
+    (fun hge s =>
+      Outcome.ofSuccess (c := by grind)
+        { s with witness := consumptionWitness.ite_left hge s.witness })
 
 infixl:20 " <|> " => choice
 

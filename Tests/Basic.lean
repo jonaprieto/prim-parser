@@ -51,6 +51,16 @@ def toText (s : String) : Text s.toList.length := ⟨s.toList, rfl⟩
 #guard digit.runResult? (toText "7x") == some 7
 #guard digit.runResult? (toText "x") == none
 
+-- ASCII.octDigit
+#guard ASCII.octDigit.runResult? (toText "7x") == some 7
+#guard ASCII.octDigit.runResult? (toText "8") == none
+
+-- ASCII.hexDigit
+#guard ASCII.hexDigit.runResult? (toText "9") == some 9
+#guard ASCII.hexDigit.runResult? (toText "a") == some 10
+#guard ASCII.hexDigit.runResult? (toText "F") == some 15
+#guard ASCII.hexDigit.runResult? (toText "g") == none
+
 -- nat
 #guard nat.runResult? (toText "0") == some 0
 #guard nat.runResult? (toText "42x") == some 42

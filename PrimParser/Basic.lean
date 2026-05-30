@@ -496,17 +496,21 @@ def token (f : Char → Option α) : Parser Error conditional α := gdo
 def satisfy (f : Char → Bool) : Parser Error conditional Char :=
   token (fun c => if f c then .some c else .none)
 
+/-- Like `satisfy` but returns `PUnit`. -/
+def skipSatisfy (f : Char → Bool) : Parser Error conditional PUnit :=
+  () <$ᵍ satisfy f
+
 /-- Match a specific character. -/
 def char (c : Char) : Parser Error conditional PUnit :=
-  () <$ᵍ satisfy (· == c)
+  skipSatisfy (· == c)
 
 /-- Match an exact string. -/
 def string (str : String) : Parser Error conditional PUnit :=
   let rec go : List Char → Parser Error conditional PUnit
     | [] => throw Error.fail
-    | [c] => () <$ᵍ satisfy (· == c)
+    | [c] => skipSatisfy (· == c)
     | c :: cs => gdo
-      satisfy (· == c)
+      skipSatisfy (· == c)
       go cs
   go str.toList
 
@@ -655,6 +659,81 @@ def int : Parser Error conditional Int := gdo
   let neg ← optional (char '-')
   let n ← nat
   return if neg.isSome then -n else n
+  grade_by by simp
+
+def space : Parser Error conditional PUnit := skipSatisfy (· == ' ')
+
+def tab : Parser Error conditional PUnit := skipSatisfy (· == '\t')
+
+namespace ASCII
+
+def lf : Parser Error conditional PUnit := skipSatisfy (· == '\n')
+
+def cr : Parser Error conditional PUnit := skipSatisfy (· == '\r')
+
+/-- Match an ASCII uppercase letter. -/
+def uppercase : Parser Error conditional Char := satisfy Char.isUpper
+
+/-- Match an ASCII lowercase letter. -/
+def lowercase : Parser Error conditional Char := satisfy Char.isLower
+
+/-- Match an ASCII letter. -/
+def alpha : Parser Error conditional Char := satisfy Char.isAlpha
+
+/-- Match an ASCII letter or digit. -/
+def alphanum : Parser Error conditional Char := satisfy Char.isAlphanum
+
+/-- Match an ASCII control character. -/
+def control : Parser Error conditional Char :=
+  satisfy fun c => c.val < 0x20 || c.val == 0x7F
+
+/-- Match a binary digit. -/
+def binDigit : Parser Error conditional Bool :=
+  token fun
+    | '0' => some false
+    | '1' => some true
+    | _   => none
+
+/-- Match an octal digit, returning its numeric value. -/
+def octDigit : Parser Error conditional (Fin 8) :=
+  token fun
+    | '0' => some 0
+    | '1' => some 1
+    | '2' => some 2
+    | '3' => some 3
+    | '4' => some 4
+    | '5' => some 5
+    | '6' => some 6
+    | '7' => some 7
+    | _ => none
+
+/-- Match a hexadecimal digit, returning its numeric value. -/
+def hexDigit : Parser Error conditional (Fin 16) :=
+  token fun
+    | '0' => some 0
+    | '1' => some 1
+    | '2' => some 2
+    | '3' => some 3
+    | '4' => some 4
+    | '5' => some 5
+    | '6' => some 6
+    | '7' => some 7
+    | '8' => some 8
+    | '9' => some 9
+    | 'a' | 'A' => some 10
+    | 'b' | 'B' => some 11
+    | 'c' | 'C' => some 12
+    | 'd' | 'D' => some 13
+    | 'e' | 'E' => some 14
+    | 'f' | 'F' => some 15
+    | _ => none
+
+end ASCII
+
+/-- Match a line terminator: LF or CRLF. -/
+def eol : Parser Error conditional PUnit := gdo
+  optional ASCII.cr
+  ASCII.lf
   grade_by by simp
 
 /-- Parse zero or more occurrences of `p` separated by `sep`. -/

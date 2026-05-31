@@ -755,6 +755,66 @@ def sepBy
               cases ge <;> cases gc <;> simp
               have := IsEmpty.false p; contradiction
 
+/-- Parse one or more occurrences of `p` separated by `sep`. -/
+def sepBy1
+  (sep : Parser ε ⟨ge', gc'⟩ β)
+  (p : Parser ε ⟨ge, gc⟩ α)
+  (h : gc' ⊔ gc = always := by simp)
+  : Parser ε ⟨ge, gc ⊔ possibly⟩ (NonEmptyList α) := gdo
+  let first ← p
+  let item : Parser ε ⟨ge' ⊔ ge, always⟩ α := gdo
+    sep; p
+    grade_by by simp [h]
+  let rest ← many item
+  return first ::₁ rest
+  grade_by by simp
+
+/-- Parse zero or more occurrences of `p`, each followed by `sep`. -/
+def endBy
+  (sep : Parser ε ⟨ge', gc'⟩ β)
+  (p : Parser ε ⟨ge, gc⟩ α)
+  (h : gc ⊔ gc' = always := by simp)
+  : Parser ε flexible (List α) :=
+  let item : Parser ε ⟨ge ⊔ ge', always⟩ α := gdo
+    let x ← p; sep; return x
+    grade_by by simp [h]
+  many item
+
+/-- Parse one or more occurrences of `p`, each followed by `sep`. -/
+def endBy1
+  (sep : Parser ε ⟨ge', gc'⟩ β)
+  (p : Parser ε ⟨ge, gc⟩ α)
+  (h : gc ⊔ gc' = always := by simp)
+  : Parser ε ⟨ge ⊔ ge', always⟩ (NonEmptyList α) :=
+  let item : Parser ε ⟨ge ⊔ ge', always⟩ α := gdo
+    let x ← p; sep; return x
+    grade_by by simp [h]
+  many1 item
+
+/-- Parse one or more occurrences of `p` separated by `sep`, with an optional
+trailing `sep`. -/
+def sepEndBy1
+  (sep : Parser ε ⟨ge', gc'⟩ β)
+  (p : Parser ε ⟨ge, gc⟩ α)
+  (h : gc' ⊔ gc = always := by simp)
+  : Parser ε ⟨ge, gc ⊔ possibly⟩ (NonEmptyList α) := gdo
+  let xs ← sepBy1 sep p (h := h)
+  weakenConsumes (optional sep)
+  return xs
+  grade_by by simp
+
+/-- Parse zero or more occurrences of `p` separated by `sep`, with an optional
+trailing `sep`. -/
+def sepEndBy
+  (sep : Parser ε ⟨ge', gc'⟩ β)
+  (p : Parser ε ⟨ge, gc⟩ α)
+  (h : gc' ⊔ gc = always := by simp)
+  : Parser ε flexible (List α) := gdo
+  let xs ← sepBy sep p (h := h)
+  weakenConsumes (optional sep)
+  return xs
+  grade_by by simp
+
 /-- Parse exactly `n + 1` occurrences of `p`. -/
 def count1
   (n : Nat)

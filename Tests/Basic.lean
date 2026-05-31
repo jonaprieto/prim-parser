@@ -38,6 +38,32 @@ def toText (s : String) : Text s.toList.length := ⟨s.toList, rfl⟩
 #guard (sepBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "123")
     == some []
 
+-- sepBy1
+#guard (sepBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,c")
+    == some ('a' ::₁ ['b', 'c'])
+#guard (sepBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "1") == none
+
+-- endBy
+#guard (endBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,")
+    == some ['a', 'b']
+#guard (endBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "1") == some []
+
+-- endBy1
+#guard (endBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,")
+    == some ('a' ::₁ ['b'])
+#guard (endBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a") == none
+
+-- sepEndBy
+#guard (sepEndBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,c,")
+    == some ['a', 'b', 'c']
+#guard (sepEndBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,c")
+    == some ['a', 'b', 'c']
+
+-- sepEndBy1
+#guard (sepEndBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,")
+    == some ('a' ::₁ ['b'])
+#guard (sepEndBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "1") == none
+
 -- sepByN
 #guard (sepByN (string ",") (satisfy Char.isAlpha) 3).runResult? (toText "a,b,c")
     == some ⟨['a', 'b', 'c'], rfl⟩

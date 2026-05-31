@@ -124,6 +124,22 @@ private def plus : Parser Error conditional (Nat → Nat → Nat) := gdo
 #guard (gdo skipWhile1 Char.isWhitespace; nat).runResult? (toText " 42") == some 42
 #guard (gdo skipWhile1 Char.isWhitespace; nat).runResult? (toText "42") == none
 
+-- skip
+#guard (skip 3 (satisfy Char.isDigit)).runResult? (toText "123abc") == some ()
+#guard (skip 3 (satisfy Char.isDigit)).runResult? (toText "12") == none
+
+-- skipUpTo
+#guard (skipUpTo 5 (satisfy Char.isDigit)).runResult? (toText "12abc") == some ()
+#guard (skipUpTo 0 (satisfy Char.isDigit)).runResult? (toText "abc") == some ()
+
+-- skipManyN
+#guard (skipManyN 2 (satisfy Char.isDigit)).runResult? (toText "1234abc") == some ()
+#guard (skipManyN 2 (satisfy Char.isDigit)).runResult? (toText "1abc") == none
+
+-- skipUntil
+#guard (skipUntil (string ";") (satisfy Char.isAlpha)).runResult? (toText "abc;rest") == some ()
+#guard (skipUntil (string ";") (satisfy Char.isAlpha)).runResult? (toText "abc") == none
+
 -- whitespace / lexeme
 #guard (gdo whitespace; nat).runResult? (toText "  42") == some 42
 #guard (lexeme nat).runResult? (toText "42  ") == some 42

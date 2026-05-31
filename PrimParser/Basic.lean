@@ -837,6 +837,35 @@ def count
   | 0 => ok .nil
   | n + 1 => count1 n p |>.relax
 
+/-- Skip exactly `n` occurrences of `p`. -/
+def skip (n : Nat) (p : Parser ε ⟨ge, gc⟩ α)
+  : Parser ε ⟨ge ⊓ possibly, gc ⊓ possibly⟩ PUnit :=
+  () <$ᵍ count n p
+
+/-- Skip up to `n` occurrences of `p`; never fails. -/
+def skipUpTo : (n : Nat) → Parser ε ⟨ge, always⟩ α → Parser ε flexible PUnit
+  | 0, _ => ok ()
+  | n + 1, p => gdo
+    let m ← weakenConsumes (optional p)
+    match m with
+    | .none => ok (ge := never) ()
+    | .some _ => skipUpTo n p
+    grade_by by simp
+
+/-- Skip `n` or more occurrences of `p`. -/
+def skipManyN (n : Nat) (p : Parser ε ⟨ge, always⟩ α)
+  : Parser ε ⟨ge ⊓ possibly, possibly⟩ PUnit := gdo
+  skip n p
+  skipMany p
+  grade_by by simp
+
+/-- Run `p` until `stop` succeeds; discard `p`'s results. -/
+def skipUntil [Inhabited ε]
+  (stop : Parser ε ⟨ge', always⟩ β)
+  (p : Parser ε ⟨ge, always⟩ α)
+  : Parser ε ⟨ge, always⟩ PUnit :=
+  () <$ᵍ manyTill p stop
+
 /-- Parse exactly `n` occurrences of `p` separated by `sep`. -/
 def sepByN
   (sep : Parser ε ⟨ge', gc'⟩ β)

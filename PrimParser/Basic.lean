@@ -1,4 +1,5 @@
 import PrimParser.Base
+import PrimParser.Indentation
 import PrimParser.Necessity
 import PrimParser.GradedMonad
 
@@ -11,8 +12,15 @@ behavior at the type level via `Necessity`.
 
 abbrev Error := String
 
-/-- Input text of statically known length `n`. -/
-abbrev Text (n : Nat) := List.Vector Char n
+/-- Input text of statically known length `n`, together with the indentation
+state at the current position. Storing the indentation state in the input
+means it backtracks (`choice`) and resumes (`tryResume`) along with the text. -/
+structure Text (n : Nat) where
+  chars : List.Vector Char n
+  indent : Indentation.State := {}
+
+def Text.ofString (s : String) : Text s.toList.length where
+  chars := ⟨s.toList, rfl⟩
 
 /-- A parser's static grade: whether it may/must produce errors and
 whether it may/must consume input. -/
@@ -188,6 +196,7 @@ instance : Functor (Outcome ε n g) where
 
 def Error.eof : Error := "eof"
 def Error.fail : Error := "fail"
+def Error.indent : Error := "indentation"
 
 def Success.le (p : Success n gc α) : p.restSize ≤ n :=
   match gc with
@@ -292,7 +301,7 @@ def bind
       | possibly => x'.bindParser f⟩
 
 instance : IsEmpty (Parser ε impossible α) where
-  false p := by cases p.run ⟨[], rfl⟩; contradiction
+  false p := by cases p.run ⟨⟨[], rfl⟩, {}⟩; contradiction
 
 /-- Lift a value into a parser that consumes nothing and never fails. -/
 abbrev pure (a : α) : Parser ε 1 α where
@@ -461,16 +470,66 @@ def runOption (p : Parser ε ⟨ge, gc⟩ α) (t : Text n) : Option (Success n g
 def runResult? (p : Parser ε ⟨ge, gc⟩ α) (t : Text n) : Option α :=
   p.run t |>.handle (fun _ _ => .none) (fun _ r => .some r.result)
 
-/-- Consume and return a single character, or fail on empty input. -/
+/-! ### Indentation sensitivity
+
+The three operators of *Indentation-Sensitive Parsing for Parsec*
+(Adams & Ağacan, Haskell '14). `localIndentation r p` is the paper's `p^▷`,
+`absoluteIndentation p` is `|p|`, and `localTokenMode` sets the default
+relation applied at every token (see `Indentation.State.checkToken`).
+-/
+
+/-- Run `p` at an indentation related to the current one by `r`: `p` is run
+with the entry set `{j | ∃ i ∈ I, j ▷ i}`, and on success the current set is
+narrowed to the indentations compatible with where `p` actually succeeded.
+Ignored inside `absoluteIndentation` until a token is consumed. -/
+def localIndentation (r : Indentation.Rel) (p : Parser ε ⟨ge, gc⟩ α)
+  : Parser ε ⟨ge, gc⟩ α where
+  run t :=
+    if t.indent.absMode then p.run t
+    else
+      let saved := t.indent.indents
+      p.run {t with indent := {t.indent with indents := r.entry saved}} |>.handle
+        (fun h f => Outcome.throwFailure (h := h) f)
+        (fun h s => Outcome.ofSuccess (c := h)
+          {s with restText := {s.restText with
+            indent := {s.restText.indent with
+              indents := r.exit saved s.restText.indent.indents}}})
+
+/-- Require the first token consumed by `p` to be at exactly one of the
+currently allowed indentations, which then becomes the indentation of the
+whole of `p`. Used for forms whose items must align (e.g. statements of a
+block). -/
+def absoluteIndentation (p : Parser ε g α) : Parser ε g α where
+  run t := p.run {t with indent := {t.indent with absMode := true}}
+
+/-- Set the default indentation relation applied at every token inside `p`,
+restoring the previous one afterwards. `localTokenMode .any` exempts `p`
+from indentation checks (e.g. for whitespace). -/
+def localTokenMode (r : Indentation.Rel) (p : Parser ε ⟨ge, gc⟩ α)
+  : Parser ε ⟨ge, gc⟩ α where
+  run t :=
+    let saved := t.indent.tokenRel
+    p.run {t with indent := {t.indent with tokenRel := r}} |>.handle
+      (fun h f => Outcome.throwFailure (h := h) f)
+      (fun h s => Outcome.ofSuccess (c := h)
+        {s with restText := {s.restText with
+          indent := {s.restText.indent with tokenRel := saved}}})
+
+/-- Consume and return a single character. Fails on empty input or when the
+character's column is not at an allowed indentation (see
+`Indentation.State.checkToken`). -/
 def anyChar : Parser Error conditional Char where
   run {n} t :=
     match n, t with
-    | 0, .nil => .inl ⟨Error.eof, .nil, by simp⟩
-    | Nat.succ n, ⟨c :: cs, p⟩ =>
-      .inr {result := c
-            restSize := n
-            restText := by refine ⟨cs, by simpa [List.length_cons] using p⟩
-            witness := by simp}
+    | 0, t => .inl ⟨Error.eof, t, by simp⟩
+    | Nat.succ n, ⟨⟨c :: cs, p⟩, is⟩ =>
+      match is.checkToken with
+      | .some is' =>
+        .inr {result := c
+              restSize := n
+              restText := ⟨⟨cs, by simpa [List.length_cons] using p⟩, is'.advance c⟩
+              witness := by simp}
+      | .none => .inl ⟨Error.indent, ⟨⟨c :: cs, p⟩, is⟩, by simp⟩
 
 /-- Like `gpure` but with a flexible grade: both `ge` and `gc` can be `never`
 or `possibly`. Useful in match branches where all cases must share the same grade. -/
@@ -605,13 +664,14 @@ def skipWhile (f : Char → Bool) : Parser Error flexible PUnit :=
 def skipWhile1 (f : Char → Bool) : Parser Error conditional PUnit :=
   () <$ᵍ takeWhile1 f
 
-/-- Skip zero or more whitespace characters. -/
+/-- Skip zero or more whitespace characters. Exempt from indentation checks,
+so that the whitespace establishing a block's indentation is always accepted. -/
 def whitespace : Parser Error flexible PUnit :=
-  skipWhile Char.isWhitespace
+  localTokenMode .any (skipWhile Char.isWhitespace)
 
-/-- Skip one or more whitespace characters. -/
+/-- Skip one or more whitespace characters. Exempt from indentation checks. -/
 def whitespace1 : Parser Error conditional PUnit :=
-  skipWhile1 Char.isWhitespace
+  localTokenMode .any (skipWhile1 Char.isWhitespace)
 
 /-- Run `p` then skip trailing whitespace. -/
 def lexeme (p : Parser Error ⟨ge, gc⟩ α) : Parser Error ⟨ge, gc ⊔ possibly⟩ α := gdo

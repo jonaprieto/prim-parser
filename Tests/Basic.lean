@@ -2,7 +2,7 @@ import PrimParser
 
 open Parser
 
-def toText (s : String) : Text s.toList.length := ⟨s.toList, rfl⟩
+def toText (s : String) : Text s.toList.length := .ofString s
 
 -- anyChar
 #guard anyChar.runResult? (toText "abc") == some 'a'
@@ -172,3 +172,41 @@ private def alwaysFail : Parser Error conditional Char := satisfy (fun _ => fals
 
 -- choice
 #guard (alwaysFail <|> anyChar).runResult? (toText "abc") == some 'a'
+
+-- absoluteIndentation: items of a block must align at the same column
+private def alignedXs : Parser Error flexible (List Char) := gdo
+  whitespace
+  many (absoluteIndentation (lexeme (satisfy (· == 'x'))))
+  grade_by by simp
+
+#guard alignedXs.runResult? (toText "x\nx\nx") == some ['x', 'x', 'x']
+#guard alignedXs.runResult? (toText "  x\n  x") == some ['x', 'x']
+#guard alignedXs.runResult? (toText "x\n x") == some ['x']  -- misaligned: stops
+#guard alignedXs.runResult? (toText " x\nx y") == some ['x']
+
+-- localIndentation: a block indented strictly more than its context
+private def abIndent : Parser Error conditional PUnit := gdo
+  whitespace
+  absoluteIndentation (lexeme (char 'a'))
+  localIndentation .gt (absoluteIndentation (lexeme (char 'b')))
+  grade_by by simp
+
+#guard abIndent.runResult? (toText "a\n  b") == some ()
+#guard abIndent.runResult? (toText "a b") == some ()
+#guard abIndent.runResult? (toText "a\nb") == none      -- not indented
+#guard abIndent.runResult? (toText "  a\n b") == none   -- dedented
+
+-- localTokenMode .gt: a line is one alpha at the line's indentation followed
+-- by alphas strictly more indented (i.e. continuation tokens)
+private def line : Parser Error conditional (List Char) := gdo
+  let c ← absoluteIndentation (lexeme ASCII.alpha)
+  let cs ← many (lexeme ASCII.alpha)
+  return c :: cs
+  grade_by by simp
+
+private def lines : Parser Error flexible (List (List Char)) :=
+  localTokenMode .gt (many line)
+
+#guard lines.runResult? (toText "a b\nc") == some [['a', 'b'], ['c']]
+#guard lines.runResult? (toText "a\n b c\nd") == some [['a', 'b', 'c'], ['d']]
+#guard lines.runResult? (toText "a\nb") == some [['a'], ['b']]

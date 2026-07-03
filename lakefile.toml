@@ -16,6 +16,13 @@ name = "Examples"
 [[lean_lib]]
 name = "Tests"
 
+[[lean_lib]]
+name = "BenchGen"
+
+[[lean_exe]]
+name = "bench"
+root = "Bench"
+
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"

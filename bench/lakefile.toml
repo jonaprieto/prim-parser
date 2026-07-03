@@ -1,0 +1,27 @@
+name = "bench-compare"
+defaultTargets = ["bench", "benchlp"]
+
+[leanOptions]
+pp.unicode.fun = true
+pp.fieldNotation = false
+autoImplicit = false
+
+[[lean_lib]]
+name = "BenchGen"
+
+[[lean_exe]]
+name = "bench"
+root = "Bench"
+
+[[lean_exe]]
+name = "benchlp"
+root = "BenchLp"
+
+[[require]]
+name = "prim-parser"
+path = "../"
+
+[[require]]
+name = "Parser"
+git = "https://github.com/fgdorais/lean4-parser"
+rev = "d8428e25efb794c9147bb9beac1dfe2e51447c3e"

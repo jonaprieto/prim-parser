@@ -1,2 +1,4 @@
 *.lake
 *.md
+bench-data/
+bench-*.tsv

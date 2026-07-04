@@ -2,9 +2,9 @@ import PrimParser.Base
 
 /-- Three-valued modality tracking whether a property holds always, possibly, or never. -/
 inductive Necessity where
+  | never
   | possibly
   | always
-  | never
   deriving Repr
 
 export Necessity (possibly always never)

@@ -52,15 +52,15 @@ instance : SemilatticeInf Necessity where
 
 instance : Monoid Necessity where
   mul := max
-  mul_assoc a b c := by cases a <;> cases b <;> cases c <;> decide
+  mul_assoc a b c := by cases a <;> cases b <;> cases c <;> rfl
   one := never
-  one_mul a := by cases a <;> decide
-  mul_one a := by cases a <;> decide
+  one_mul a := by cases a <;> rfl
+  mul_one a := by cases a <;> rfl
 
 instance : Lattice Necessity where
 
 instance : DistribLattice Necessity where
-  le_sup_inf a b c := by cases a <;> cases b <;> cases c <;> decide
+  le_sup_inf a b c := by cases a <;> cases b <;> cases c <;> rfl
 
 /-- Flips `always` and `never`, leaving `possibly` unchanged. -/
 abbrev complement : Necessity → Necessity
@@ -78,12 +78,12 @@ variable
 @[simp] theorem complement_possibly : possibly.complement = possibly := rfl
 @[simp] theorem complement_never : never.complement = always := rfl
 
-@[simp] theorem max_never_right : a ⊔ never = a := by cases a <;> decide
-@[simp] theorem max_never_left : never ⊔ a = a := by cases a <;> decide
-@[simp] theorem max_idem : a ⊔ a = a := by cases a <;> decide
+@[simp] theorem max_never_right : a ⊔ never = a := by cases a <;> rfl
+@[simp] theorem max_never_left : never ⊔ a = a := by cases a <;> rfl
+@[simp] theorem max_idem : a ⊔ a = a := by cases a <;> rfl
 
-@[simp] theorem never_le : never ≤ a := by cases a <;> decide
-@[simp] theorem le_always : a ≤ always := by cases a <;> decide
+@[simp] theorem never_le : never ≤ a := bot_le
+@[simp] theorem le_always : a ≤ always := le_top
 @[simp] theorem max_always : a ⊔ b = always ↔ a = always ∨ b = always := by
   cases a <;> cases b <;> decide
 @[simp] theorem max_never : a ⊔ b = never ↔ a = never ∧ b = never := by

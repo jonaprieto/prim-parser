@@ -1,0 +1,93 @@
+name: Benchmark
+
+# Comment `@bench` on a PR to run the parser benchmarks and get the results
+# posted back as a comment. `issue_comment` workflows always run the copy of
+# this file on the default branch, so it must be merged there to take effect.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bench:
+    # Trusted commenters only: bench builds and runs PR code with a write token,
+    # so restrict the trigger to people with push access.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@bench') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: React to trigger
+        if: github.event_name == 'issue_comment'
+        run: |
+          gh api --method POST \
+            "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content=eyes || true
+
+      - name: Resolve PR head
+        id: pr
+        if: github.event_name == 'issue_comment'
+        run: |
+          num=${{ github.event.issue.number }}
+          sha=$(gh api "repos/${{ github.repository }}/pulls/$num" -q .head.sha)
+          echo "num=$num" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.pr.outputs.sha || github.sha }}
+
+      - uses: leanprover/lean-action@v1
+        with:
+          build: false
+          test: false
+
+      - name: Run benchmarks
+        run: |
+          lake exe bench | tee prim.out
+          ( cd bench && lake exe cache get >/dev/null 2>&1 || true; lake exe benchlp ) | tee lp.out
+
+      - name: Format results
+        run: |
+          {
+            echo '<!-- bench -->'
+            echo "### Benchmark results"
+            echo ""
+            echo "Commit \`${{ steps.pr.outputs.sha || github.sha }}\` — min time over the repetitions, higher MB/s is better."
+            echo ""
+            awk -F'\t' '
+              FNR==NR { if (!($1 in pm)) ord[++k]=$1; pm[$1]=$2; pb[$1]=$3; next }
+              { lm[$1]=$2; lb[$1]=$3 }
+              END {
+                print "| grammar | prim min ms | prim MB/s | lean4-parser min ms | lean4-parser MB/s | prim ÷ lp |"
+                print "|---|--:|--:|--:|--:|--:|"
+                for (i = 1; i <= k; i++) {
+                  n = ord[i]
+                  ratio = (lm[n] > 0) ? sprintf("%.2f×", pm[n] / lm[n]) : "-"
+                  printf "| %s | %.2f | %.2f | %.2f | %.2f | %s |\n", n, pm[n], pb[n], lm[n], lb[n], ratio
+                }
+              }' bench-prim.tsv bench/bench-lp.tsv
+          } > body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post comment
+        if: steps.pr.outputs.num
+        run: |
+          gh pr comment "${{ steps.pr.outputs.num }}" \
+            --body-file body.md --edit-last --create-if-none
+
+      - name: React done
+        if: github.event_name == 'issue_comment'
+        run: |
+          gh api --method POST \
+            "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content=rocket || true

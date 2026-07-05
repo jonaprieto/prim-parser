@@ -1,0 +1,107 @@
+name: Benchmark
+
+# `/bench` PR comment runs the benchmarks and posts a results comment.
+# issue_comment workflows run the copy on the default branch, so it only
+# takes effect once merged there.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bench:
+    # Trusted commenters only: builds and runs PR code with a write token.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/bench') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: React to trigger
+        if: github.event_name == 'issue_comment'
+        run: |
+          gh api --method POST \
+            "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content=eyes || true
+
+      - name: Resolve PR head
+        id: pr
+        if: github.event_name == 'issue_comment'
+        run: |
+          num=${{ github.event.issue.number }}
+          pr=$(gh api "repos/${{ github.repository }}/pulls/$num")
+          echo "num=$num" >> "$GITHUB_OUTPUT"
+          echo "sha=$(echo "$pr" | jq -r .head.sha)" >> "$GITHUB_OUTPUT"
+          echo "base=$(echo "$pr" | jq -r .base.sha)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ steps.pr.outputs.sha || github.sha }}
+          fetch-depth: 0
+
+      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+        with:
+          build: false
+          test: false
+
+      - name: Run benchmarks
+        run: |
+          # PR head: prim + lean4-parser reference.
+          ( cd bench && lake exe cache get >/dev/null 2>&1 || true; lake exe bench; lake exe benchlp )
+          cp bench/bench-prim.tsv prim-pr.tsv
+          cp bench/bench-lp.tsv   lp.tsv
+          # Baseline: same harness against the PR base commit's prim-parser.
+          : > prim-base.tsv
+          if [ -n "${{ steps.pr.outputs.base }}" ]; then
+            git checkout -q "${{ steps.pr.outputs.base }}" -- PrimParser Examples Tests lakefile.toml \
+              && ( cd bench && lake exe bench ) \
+              && cp bench/bench-prim.tsv prim-base.tsv \
+              || echo "baseline bench failed; reporting PR only"
+          fi
+
+      - name: Format results
+        run: |
+          {
+            echo '<!-- bench -->'
+            echo "### Benchmark results"
+            echo ""
+            echo "PR \`${{ steps.pr.outputs.sha || github.sha }}\` vs base \`${{ steps.pr.outputs.base }}\` — min ms over the repetitions. Δ = PR vs base, lower is better. lean4-parser is an external reference."
+            echo ""
+            awk -F'\t' '
+              FILENAME ~ /prim-pr/   { if (!($1 in seen)) { ord[++k]=$1; seen[$1]=1 }; pr[$1]=$2; next }
+              FILENAME ~ /prim-base/ { base[$1]=$2; next }
+              FILENAME ~ /lp\.tsv/   { lp[$1]=$2; next }
+              END {
+                print "| grammar | prim PR ms | prim base ms | Δ | lean4-parser ms |"
+                print "|---|--:|--:|--:|--:|"
+                for (i = 1; i <= k; i++) {
+                  n = ord[i]
+                  has = (n in base)
+                  bm = has ? sprintf("%.2f", base[n]) : "-"
+                  d  = (has && base[n] > 0) ? sprintf("%+.1f%%", (pr[n] - base[n]) / base[n] * 100) : "-"
+                  printf "| %s | %.2f | %s | %s | %.2f |\n", n, pr[n], bm, d, lp[n]
+                }
+              }' prim-pr.tsv prim-base.tsv lp.tsv
+          } > body.md
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post comment
+        if: steps.pr.outputs.num
+        run: |
+          gh pr comment "${{ steps.pr.outputs.num }}" \
+            --body-file body.md --edit-last --create-if-none
+
+      - name: React done
+        if: github.event_name == 'issue_comment'
+        run: |
+          gh api --method POST \
+            "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content=rocket || true

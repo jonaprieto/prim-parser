@@ -1,6 +1,7 @@
 import PrimParser.Base
 import PrimParser.Necessity
 import PrimParser.GradedMonad
+import PrimParser.Grade
 
 /-!
 # PrimParser
@@ -13,78 +14,6 @@ abbrev Error := String
 
 /-- Input text of statically known length `n`. -/
 abbrev Text (n : Nat) := List.Vector Char n
-
-/-- A parser's static grade: whether it may/must produce errors and
-whether it may/must consume input. -/
-structure Grade where
-  errors : Necessity
-  consumes : Necessity
-  deriving Repr
-
-namespace Grade
-
--- No parser can always consume and never fail, because it must accept empty
--- input
-abbrev impossible : Grade where
-  consumes := always
-  errors := never
-
-abbrev conditional : Grade where
-  consumes := always
-  errors := possibly
-
-abbrev flexible : Grade where
-  consumes := possibly
-  errors := never
-
-abbrev fallible : Grade where
-  consumes := possibly
-  errors := possibly
-
-abbrev pure : Grade where
-  consumes := never
-  errors := never
-
-abbrev lookahead : Grade where
-  consumes := never
-  errors := possibly
-
-abbrev empty : Grade where
-  consumes := never
-  errors := always
-
-@[simp] def max (a b : Grade) : Grade := ⟨a.errors ⊔ b.errors, a.consumes ⊔ b.consumes⟩
-
-instance : Max Grade where
-  max := max
-
-instance : Monoid Grade where
-  mul := max
-  mul_assoc a b c := by cases a; cases b; simp [HMul.hMul, Mul.mul]; grind
-  one := pure
-  one_mul a := by cases a; simp [HMul.hMul, Mul.mul, OfNat.ofNat, pure]
-  mul_one a := by cases a; simp [HMul.hMul, Mul.mul, OfNat.ofNat, pure]
-
-instance : Zero Grade where
-  zero := empty
-
-variable (e1 e2 c1 c2 : Necessity)
-
-@[simp] theorem mul_mk : (⟨e1, c1⟩ : Grade) * ⟨e2, c2⟩ = ⟨e1 ⊔ e2, c1 ⊔ c2⟩ := by
-  simp [HMul.hMul, Mul.mul]
-
-@[simp] theorem one_mk : (1 : Grade) = ⟨never, never⟩ := by
-  simp [OfNat.ofNat, One.one]
-
-@[simp] theorem mul_idem (g : Grade) : g * g = g := by cases g; simp
-
-def choice (a b : Grade) : Grade where
-  errors := a.errors ⊓ b.errors
-  consumes := a.errors.ite b.consumes a.consumes
-
-end Grade
-
-export Grade (impossible conditional flexible fallible pure lookahead empty)
 
 namespace Parser
 

@@ -53,8 +53,7 @@ theorem gbind_assoc
     simp [gbind, bind]
     congr 1
     · grind
-    · simp [HMul.hMul, Mul.mul]
-      refine Function.hfunext rfl ?_; intro _ _ .rfl
+    · refine Function.hfunext rfl ?_; intro _ _ .rfl
       refine Function.hfunext rfl ?_; intro t _ .rfl
       cases ge2 <;> simp
       · cases p t <;> simp [Outcome.throwFailure, Success.bindParser]
@@ -102,8 +101,7 @@ theorem gbind_assoc
     simp [gbind, bind]
     congr 1
     · grind
-    · simp [HMul.hMul, Mul.mul, max]
-      cases ge2 <;> simp
+    · cases ge2 <;> simp
       · case possibly =>
         refine Function.hfunext rfl ?_; intro _ _ .rfl
         refine Function.hfunext rfl ?_; intro t _ .rfl
@@ -172,8 +170,7 @@ instance : LawfulGradedApplicative (Parser ε) where
       simp [GradedApplicative.gseq, bind]
       congr 1
       · grind
-      · simp [HMul.hMul, Mul.mul]
-        refine Function.hfunext rfl ?_; intro _ _ .rfl
+      · refine Function.hfunext rfl ?_; intro _ _ .rfl
         refine Function.hfunext rfl ?_; intro t1 t2 .rfl
         cases ge2 <;> simp [GradedFunctor.gmap, Functor.map, Sum.bind]
         · cases p1 t1 <;> simp [Outcome.throwFailure, Success.bindParser]
@@ -222,8 +219,7 @@ instance : LawfulGradedApplicative (Parser ε) where
       simp [GradedApplicative.gseq, bind]
       congr 1
       · grind
-      · simp [HMul.hMul, Mul.mul]
-        cases ge2 <;> simp
+      · cases ge2 <;> simp
         · case possibly =>
           refine Function.hfunext rfl ?_; intro _ _ .rfl
           refine Function.hfunext rfl ?_; intro t1 t2 .rfl
@@ -275,7 +271,7 @@ instance : LawfulGradedMonad (Parser ε) where
     intro ⟨ge, gc⟩ _ ⟨p⟩
     simp [gpure, gbind, bind]
     congr 1
-    · simp [OfNat.ofNat, One.one, HMul.hMul, Mul.mul]
+    · simp [OfNat.ofNat, One.one]
     · refine Function.hfunext rfl ?_; intro _ _ .rfl
       refine Function.hfunext rfl ?_; intro t _ .rfl
       cases ge <;> simp [Outcome.throwFailure, Success.bindParser, Success.seq]
@@ -283,7 +279,7 @@ instance : LawfulGradedMonad (Parser ε) where
         cases p t <;> simp
         · congr 2; simp [OfNat.ofNat, One.one]
         · congr 2
-          · simp [OfNat.ofNat, One.one, HMul.hMul, Mul.mul]
+          · simp [OfNat.ofNat, One.one]
           · simp [OfNat.ofNat, One.one]
           · apply proof_irrel_heq
       · case never =>

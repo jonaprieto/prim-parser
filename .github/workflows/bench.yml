@@ -37,10 +37,9 @@ jobs:
         if: github.event_name == 'issue_comment'
         run: |
           num=${{ github.event.issue.number }}
-          pr=$(gh api "repos/${{ github.repository }}/pulls/$num")
           echo "num=$num" >> "$GITHUB_OUTPUT"
-          echo "sha=$(echo "$pr" | jq -r .head.sha)" >> "$GITHUB_OUTPUT"
-          echo "base=$(echo "$pr" | jq -r .base.sha)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(gh api "repos/${{ github.repository }}/pulls/$num" -q .head.sha)" >> "$GITHUB_OUTPUT"
+          echo "base=$(gh api "repos/${{ github.repository }}/pulls/$num" -q .base.sha)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

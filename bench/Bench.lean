@@ -8,7 +8,7 @@ import BenchGen
 
 open Parser
 
-def toText (s : String) : Text s.toList.length := ⟨s.toList, rfl⟩
+def toText (s : String) : Text s.toList.length := ofString s
 
 def primInts : Parser Error flexible (List Nat) := sepBy (string ",") nat
 

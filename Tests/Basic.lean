@@ -2,7 +2,7 @@ import PrimParser
 
 open Parser
 
-def toText (s : String) : Text s.toList.length := ⟨s.toList, rfl⟩
+def toText (s : String) : Text s.toList.length := ofString s
 
 -- anyChar
 #guard anyChar.runResult? (toText "abc") == some 'a'

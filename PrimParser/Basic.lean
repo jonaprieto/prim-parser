@@ -12,7 +12,24 @@ behavior at the type level via `Necessity`.
 abbrev Error := String
 
 /-- Input text of statically known length `n`. -/
-abbrev Text (n : Nat) := List.Vector Char n
+structure Text (n : Nat) where
+  arr : Array Char
+  off : Nat
+  inv : off + n = arr.size
+
+/-- Runtime decoder: build the char array in a single pass, straight into an
+`Array` (no intermediate `List`, whose construction dominates for large inputs). -/
+@[inline] def decodeArrFast (s : String) : Array Char := s.foldl (fun a c => a.push c) #[]
+
+/-- Decode a `String` to its character array. Definitionally `s.toList.toArray` (so
+`decide`/kernel proofs on concrete inputs reduce), but compiled to the single-pass
+`decodeArrFast` at runtime. -/
+@[implemented_by decodeArrFast]
+def decodeArr (s : String) : Array Char := s.toList.toArray
+
+/-- Build character input from a `String`. -/
+def ofString (s : String) : Text s.toList.length :=
+  { arr := decodeArr s, off := 0, inv := by simp [decodeArr] }
 
 /-- A parser's static grade: whether it may/must produce errors and
 whether it may/must consume input. -/
@@ -292,7 +309,8 @@ def bind
       | possibly => x'.bindParser f⟩
 
 instance : IsEmpty (Parser ε impossible α) where
-  false p := by cases p.run ⟨[], rfl⟩; contradiction
+  false p := by cases p.run (⟨#[], 0, by simp⟩ : Text 0); contradiction
+
 
 /-- Lift a value into a parser that consumes nothing and never fails. -/
 abbrev pure (a : α) : Parser ε 1 α where
@@ -465,12 +483,12 @@ def runResult? (p : Parser ε ⟨ge, gc⟩ α) (t : Text n) : Option α :=
 def anyChar : Parser Error conditional Char where
   run {n} t :=
     match n, t with
-    | 0, .nil => .inl ⟨Error.eof, .nil, by simp⟩
-    | Nat.succ n, ⟨c :: cs, p⟩ =>
-      .inr {result := c
-            restSize := n
-            restText := by refine ⟨cs, by simpa [List.length_cons] using p⟩
-            witness := by simp}
+    | 0, t => .inl ⟨Error.eof, t, by simp⟩
+    | Nat.succ m, t =>
+      .inr {result := t.arr[t.off]'(by have := t.inv; omega)
+            restSize := m
+            restText := ⟨t.arr, t.off + 1, by have := t.inv; omega⟩
+            witness := by omega}
 
 /-- Like `gpure` but with a flexible grade: both `ge` and `gc` can be `never`
 or `possibly`. Useful in match branches where all cases must share the same grade. -/

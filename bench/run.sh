@@ -11,14 +11,18 @@
 # hyperfine times the binaries per workload (comparing the two, or just REF_A).
 #
 # Tunables (environment variables):
-#   WORKLOADS  space-separated subset of "json arith csv"   (default: all)
-#   SIZE       problem size per workload                     (default: 2000)
-#   ITERS      reparses per process invocation               (default: 200)
-#   WARMUP     hyperfine warmup runs                          (default: 3)
-#   RUNS       hyperfine measured runs                        (default: 10)
-#   KEEP       keep worktrees after the run                   (default: 1)
+#   WORKLOADS  space-separated subset of "json arith csv" (default: all)
+#   SIZE       problem size per workload (default: 2000)
+#   ITERS      reparses per process invocation (default: 200)
+#   WARMUP     hyperfine warmup runs (default: 3)
+#   RUNS       hyperfine measured runs (default: 10)
+#   KEEP       keep worktrees after the run (default: 1)
 #   SHARE      symlink the main checkout's built .lake/packages (default: 1);
 #              set 0 when refs pin different toolchain/Mathlib versions
+#   HARNESS    "own" uses each ref's own bench/Bench.lean; "current" forces
+#              this checkout's onto all refs (default: own)
+#   INPLACE    build the working checkout directly instead of a worktree,
+#              reusing a cached .lake/build (single-ref only; default: 0)
 #
 set -euo pipefail
 
@@ -39,6 +43,8 @@ WARMUP="${WARMUP:-3}"
 RUNS="${RUNS:-10}"
 KEEP="${KEEP:-1}"
 SHARE="${SHARE:-1}"
+HARNESS="${HARNESS:-own}"
+INPLACE="${INPLACE:-0}"
 
 command -v hyperfine >/dev/null || { echo "error: hyperfine not found on PATH" >&2; exit 1; }
 [ -d "$REPO/.lake/packages" ] || {
@@ -52,6 +58,16 @@ slug() { printf '%s' "$1" | tr '/ ' '__'; }
 # Build the `bench` executable for a ref inside its worktree; echo the binary path.
 build_ref() {
   local ref="$1"
+
+  # In-place: build the committed `bench` exe in the main checkout, reusing a
+  # cached .lake/build (e.g. lean-action's on CI) instead of a fresh worktree.
+  if [ "$INPLACE" = "1" ]; then
+    echo ">>> $ref (in place: $REPO)" >&2
+    ( cd "$REPO" && lake build bench ) >&2
+    echo "$REPO/.lake/build/bin/bench"
+    return
+  fi
+
   local wt="$WORKTREE_ROOT/$(slug "$ref")"
   local rev
   rev="$(git -C "$REPO" rev-parse "$ref")"
@@ -79,7 +95,12 @@ build_ref() {
     ( cd "$wt" && lake exe cache get ) >&2 || true
   fi
 
-  cp "$BENCH_DIR/Bench.lean" "$wt/Bench.lean"
+  # "own": ref's own harness (fallback to this checkout's); else force this one.
+  if [ "$HARNESS" = "own" ] && [ -f "$wt/bench/Bench.lean" ]; then
+    cp "$wt/bench/Bench.lean" "$wt/Bench.lean"
+  else
+    cp "$BENCH_DIR/Bench.lean" "$wt/Bench.lean"
+  fi
   if ! grep -q 'name = "bench"' "$wt/lakefile.toml"; then
     printf '\n[[lean_exe]]\nname = "bench"\nroot = "Bench"\n' >> "$wt/lakefile.toml"
   fi

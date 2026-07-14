@@ -1,0 +1,11 @@
+*.lake
+*.md
+/bench-data/
+/bench-prim.tsv
+/bench-lp.tsv
+/bench-text.tsv
+
+/bench/atto-canada/dist-newstyle/
+/bench/nom-canada/target/
+
+!/paper/

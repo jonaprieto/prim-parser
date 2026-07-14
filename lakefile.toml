@@ -1,0 +1,85 @@
+name = "prim-parser"
+version = "0.1.0"
+defaultTargets = ["PrimParser"]
+
+[leanOptions]
+pp.unicode.fun = true
+pp.fieldNotation = false
+autoImplicit = false
+
+[[lean_lib]]
+name = "PrimParser"
+
+[[lean_lib]]
+name = "Examples"
+
+[[lean_lib]]
+name = "Tests"
+
+[[lean_lib]]
+name = "BenchGen"
+
+[[lean_exe]]
+name = "jcanada"
+root = "JCanada"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "jcanada-shallow"
+root = "JCanadaShallow"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "gfw"
+root = "GradedFrameworkBench"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "bench"
+root = "Bench"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "benchlp"
+root = "BenchLp"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "benchtext"
+root = "BenchText"
+srcDir = "bench"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.28.0"
+
+[[require]]
+name = "Parser"
+git = "https://github.com/fgdorais/lean4-parser"
+rev = "d8428e25efb794c9147bb9beac1dfe2e51447c3e"
+
+[[lean_exe]]
+name = "jhand"
+root = "JHand"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "jcombo"
+root = "JCombo"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "l4canada"
+root = "L4Canada"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "fpbench"
+root = "FPBench"
+srcDir = "bench"
+
+[[lean_exe]]
+name = "jcompiled"
+root = "JCompiled"
+srcDir = "bench"

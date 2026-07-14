@@ -1,0 +1,196 @@
+import PrimParser
+
+open Parser
+
+def toText (s : String) : Text s.toList.length := ofString s
+
+-- anyChar
+#guard anyChar.runResult? (toText "abc") == some 'a'
+#guard anyChar.runResult? (toText "") == none
+
+-- char
+#guard (char 'a').runResult? (toText "abc") == some ()
+#guard (char 'x').runResult? (toText "abc") == none
+
+-- satisfy
+#guard (satisfy Char.isAlpha).runResult? (toText "abc") == some 'a'
+#guard (satisfy Char.isDigit).runResult? (toText "x") == none
+
+-- string
+#guard (string "hel").runResult? (toText "hello") == some ()
+#guard (string "xyz").runResult? (toText "hello") == none
+
+-- many
+#guard (many (satisfy Char.isDigit)).runResult? (toText "x") == some []
+#guard (many (satisfy Char.isDigit)).runResult? (toText "123x") == some ['1', '2', '3']
+
+-- manyArr: same results as `many`, into an Array, tail-recursively (DoS-safe on huge input)
+#guard (manyArr (satisfy Char.isDigit)).runResult? (toText "x") == some #[]
+#guard (manyArr (satisfy Char.isDigit)).runResult? (toText "123x") == some #['1', '2', '3']
+
+-- optional
+#guard (optional (satisfy Char.isDigit)).runResult? (toText "1x") == some (some '1')
+#guard (optional (satisfy Char.isDigit)).runResult? (toText "x") == some none
+
+-- many1
+#guard (many1 (satisfy Char.isDigit)).runResult? (toText "123x") == some ('1' ::₁ ['2', '3'])
+#guard (many1 (satisfy Char.isDigit)).runResult? (toText "x") == none
+
+-- sepBy
+#guard (sepBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,c")
+    == some ['a', 'b', 'c']
+#guard (sepBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "123")
+    == some []
+
+-- sepBy1
+#guard (sepBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,c")
+    == some ('a' ::₁ ['b', 'c'])
+#guard (sepBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "1") == none
+
+-- endBy
+#guard (endBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,")
+    == some ['a', 'b']
+#guard (endBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "1") == some []
+
+-- endBy1
+#guard (endBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,")
+    == some ('a' ::₁ ['b'])
+#guard (endBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a") == none
+
+-- sepEndBy
+#guard (sepEndBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,c,")
+    == some ['a', 'b', 'c']
+#guard (sepEndBy (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,c")
+    == some ['a', 'b', 'c']
+
+-- sepEndBy1
+#guard (sepEndBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "a,b,")
+    == some ('a' ::₁ ['b'])
+#guard (sepEndBy1 (string ",") (satisfy Char.isAlpha)).runResult? (toText "1") == none
+
+-- sepByN
+#guard (sepByN (string ",") (satisfy Char.isAlpha) 3).runResult? (toText "a,b,c")
+    == some ⟨['a', 'b', 'c'], rfl⟩
+#guard (sepByN (string ",") (satisfy Char.isAlpha) 0).runResult? (toText "abc")
+    == some ⟨[], rfl⟩
+#guard (sepByN (string ",") (satisfy Char.isAlpha) 2).runResult? (toText "a,b,c")
+    == some ⟨['a', 'b'], rfl⟩
+#guard (sepByN (string ",") (satisfy Char.isAlpha) 3).runResult? (toText "a,b") == none
+
+-- digit
+#guard digit.runResult? (toText "7x") == some 7
+#guard digit.runResult? (toText "x") == none
+
+-- ASCII.octDigit
+#guard ASCII.octDigit.runResult? (toText "7x") == some 7
+#guard ASCII.octDigit.runResult? (toText "8") == none
+
+-- ASCII.hexDigit
+#guard ASCII.hexDigit.runResult? (toText "9") == some 9
+#guard ASCII.hexDigit.runResult? (toText "a") == some 10
+#guard ASCII.hexDigit.runResult? (toText "F") == some 15
+#guard ASCII.hexDigit.runResult? (toText "g") == none
+
+-- nat
+#guard nat.runResult? (toText "0") == some 0
+#guard nat.runResult? (toText "42x") == some 42
+#guard nat.runResult? (toText "123") == some 123
+#guard nat.runResult? (toText "x") == none
+
+-- int
+#guard int.runResult? (toText "42") == some 42
+#guard int.runResult? (toText "-7") == some (-7)
+#guard int.runResult? (toText "-0") == some 0
+#guard int.runResult? (toText "x") == none
+#guard int.runResult? (toText "-x") == none
+
+-- chainl1
+private def plus : Parser Error conditional (Nat → Nat → Nat) := gdo
+  let _ ← satisfy (· == '+')
+  return (· + ·)
+
+#guard (chainl1 plus digit).runResult? (toText "5") == some 5
+#guard (chainl1 plus digit).runResult? (toText "1+2+3") == some 6
+
+-- eof
+#guard eof.runResult? (toText "") == some ()
+#guard eof.runResult? (toText "x") == none
+
+-- takeWhile / takeWhile1
+#guard (takeWhile Char.isAlpha).runResult? (toText "abc123") == some "abc"
+#guard (takeWhile Char.isAlpha).runResult? (toText "123") == some ""
+#guard (takeWhile1 Char.isAlpha).runResult? (toText "abc123") == some "abc"
+#guard (takeWhile1 Char.isAlpha).runResult? (toText "123") == none
+
+-- skipWhile / skipWhile1
+#guard (gdo skipWhile Char.isWhitespace; nat).runResult? (toText "  42") == some 42
+#guard (gdo skipWhile Char.isWhitespace; nat).runResult? (toText "42") == some 42
+#guard (gdo skipWhile1 Char.isWhitespace; nat).runResult? (toText " 42") == some 42
+#guard (gdo skipWhile1 Char.isWhitespace; nat).runResult? (toText "42") == none
+
+-- skip
+#guard (skip 3 (satisfy Char.isDigit)).runResult? (toText "123abc") == some ()
+#guard (skip 3 (satisfy Char.isDigit)).runResult? (toText "12") == none
+
+-- skipUpTo
+#guard (skipUpTo 5 (satisfy Char.isDigit)).runResult? (toText "12abc") == some ()
+#guard (skipUpTo 0 (satisfy Char.isDigit)).runResult? (toText "abc") == some ()
+
+-- skipManyN
+#guard (skipManyN 2 (satisfy Char.isDigit)).runResult? (toText "1234abc") == some ()
+#guard (skipManyN 2 (satisfy Char.isDigit)).runResult? (toText "1abc") == none
+
+-- skipUntil
+#guard (skipUntil (string ";") (satisfy Char.isAlpha)).runResult? (toText "abc;rest") == some ()
+#guard (skipUntil (string ";") (satisfy Char.isAlpha)).runResult? (toText "abc") == none
+
+-- whitespace / lexeme
+#guard (gdo whitespace; nat).runResult? (toText "  42") == some 42
+#guard (lexeme nat).runResult? (toText "42  ") == some 42
+
+-- lookahead
+#guard (gdo let _ ← lookahead nat; nat).runResult? (toText "42") == some 42
+#guard (lookahead nat).runResult? (toText "x") == none
+
+-- notFollowedBy
+#guard (gdo notFollowedBy (char 'x'); nat).runResult? (toText "42") == some 42
+#guard (gdo notFollowedBy (char 'x'); nat).runResult? (toText "x2") == none
+
+-- manyTill
+#guard (manyTill anyChar (char '.')).runResult? (toText "abc.") == some ['a', 'b', 'c']
+#guard (manyTill anyChar (char '.')).runResult? (toText ".") == some []
+
+-- withRecovery
+private def recoverDigit : Error → Parser Error conditional Nat :=
+  fun _ => digit
+
+#guard (withRecovery recoverDigit (char 'x' >>=ᵍ fun _ => gpure 99)).runResult? (toText "x")
+    == some 99
+#guard (withRecovery recoverDigit (char 'x' >>=ᵍ fun _ => gpure 99)).runResult? (toText "5")
+    == some 5
+
+-- tryResume: `eatThenFail` consumes one char then fails, so tryResume resumes at
+-- the failure point ("bc" -> 'b'); withBacktracking restores the input ("abc" -> 'a')
+private def alwaysFail : Parser Error conditional Char := satisfy (fun _ => false)
+private def eatThenFail : Parser Error conditional Char := gdo
+  anyChar; satisfy (fun _ => false)
+  grade_by by simp
+#guard (tryResume eatThenFail anyChar).runResult? (toText "abc") == some 'b'
+#guard (tryResume (withBacktracking eatThenFail) anyChar).runResult? (toText "abc") == some 'a'
+-- satisfy now fails WITHOUT consuming, so tryResume over it resumes at offset 0
+#guard (tryResume alwaysFail anyChar).runResult? (toText "abc") == some 'a'
+
+-- choice
+#guard (alwaysFail <|> anyChar).runResult? (toText "abc") == some 'a'
+
+-- committedChoice = real LL(1): char 'a' fails without consuming on "b", so the
+-- second branch is tried (needs the non-consuming `token`)
+#guard (committedChoice (char 'a') (char 'b')).runResult? (toText "b") == some ()
+-- but a branch that consumes before failing commits (no backtrack): "le" then t≠x
+#guard (committedChoice (string "let") (string "lex")).runResult? (toText "lex") == none
+#guard ((string "let") <|> (string "lex")).runResult? (toText "lex") == some ()  -- <|> backtracks
+
+-- getOffset / getRemaining: read-only position, no consumption
+#guard (gdo let a ← nat; let p ← getOffset; return (a, p)).parse? "42abc" == some (42, 2)
+#guard getOffset.parse? "abc" == some 0
+#guard (gdo anyChar; getRemaining).parse? "abc" == some 2

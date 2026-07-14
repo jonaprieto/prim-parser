@@ -1,0 +1,46 @@
+* prim-parser - Total Parser Combinators with do notation
+Parser combinator library in Lean 4 with *graded monads*. Each parser carries a
+~Grade~ tracking whether it /always/, /possibly/, or /never/ errors and consumes
+input. Grades guarantee that parsers are total.
+
+The graded monad laws (~LawfulGradedMonad~) are proven for ~Parser~.
+
+** Structure
+- ~PrimParser/~ -- library: ~Grade~, ~Parser~, combinators, graded monad typeclasses, ~gdo~ notation
+- ~Examples/~ -- example parsers
+- ~Tests/~ -- ~#guard~-based compile-time tests
+
+** Build
+#+begin_src sh
+lake build           # library
+lake build Tests     # tests
+#+end_src
+
+** Example: S-expression parser
+A recursive S-expression parser using ~gdo~ notation and library combinators:
+#+begin_src lean
+inductive SExp where
+  | atom (str : String)
+  | pair (l r : SExp)
+
+def patom : Parser Error .conditional SExp :=
+  .atom <$>ᵍ takeWhile1 (·.isAlphanum)
+
+def sexp : Parser Error .conditional SExp :=
+  fix (fun sexp_rec =>
+    let plist : Parser Error .conditional SExp := gdo
+      lexeme (char '(')
+      let first ← sexp_rec
+      let rest ← many (gdo whitespace; sexp_rec)
+      lexeme (char ')')
+      return listToPairs (first :: rest)
+      grade_by by simp
+    choice patom plist)
+#+end_src
+~gdo~ is do-notation for graded monads --- standard ~do~ doesn't work because
+each bind changes the grade. ~grade_by~ discharges the proof that the computed
+grade matches the expected type.
+
+The grade ~.conditional~ means: possibly errors, always consumes. The ~fix~
+combinator requires ~consumes = .always~, ensuring termination. Consumption is
+guaranteed by the typechecker.
